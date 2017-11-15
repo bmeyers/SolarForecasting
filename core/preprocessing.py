@@ -124,6 +124,8 @@ def summarize_files(file_path, suffix='gz', verbose=False, testing=False):
             print '{}/{} complete:'.format(it+1, N), name
     df = pd.DataFrame.from_dict(data, orient='index')
     df = df[['t_start', 't_end', 'num_vals', 'ac_max', 'ac_min', 'ac_avg', 'ac_stdev']]
+    df.reset_index(inplace=True)
+    df.rename(columns={'index': 'ID'})
     return df
 
 def pickle_files(file_path, suffix='gz', verbose=False):
