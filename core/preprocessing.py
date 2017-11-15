@@ -20,22 +20,23 @@ def data_summary(df):
     output = {}
     for sn in serial_numbers:
         df_view = df[df['serial_number'] == sn].dropna()
-        tstart = df.iloc[0]
-        tend = df.iloc[-1]
-        nvals = len(df_view)
-        ac_max = np.max(df_view['ac_power'])
-        ac_min = np.min(df_view['ac_power'])
-        ac_avg = np.mean(df_view['ac_power'])
-        ac_stdev = np.std(df_view['ac_power'])
-        output[sn] = {
-            't_start': tstart,
-            't_end': tend,
-            'num_vals': nvals,
-            'ac_max': ac_max,
-            'ac_min': ac_min,
-            'ac_avg': ac_avg,
-            'ac_stdev': ac_stdev
-        }
+        if len(df_view) != 0:
+            tstart = df['timestamp'].iloc[0]
+            tend = df['timestamp'].iloc[-1]
+            nvals = len(df_view)
+            ac_max = np.max(df_view['ac_power'])
+            ac_min = np.min(df_view['ac_power'])
+            ac_avg = np.mean(df_view['ac_power'])
+            ac_stdev = np.std(df_view['ac_power'])
+            output[sn] = {
+                't_start': tstart,
+                't_end': tend,
+                'num_vals': nvals,
+                'ac_max': ac_max,
+                'ac_min': ac_min,
+                'ac_avg': ac_avg,
+                'ac_stdev': ac_stdev
+            }
     return output
 
 def load_raw_file(filename, kind='csv'):
@@ -45,7 +46,7 @@ def load_raw_file(filename, kind='csv'):
     :param filename: the file path to a SunPower type-130 raw data file
     :return: a pandas
     '''
-    if kind == 'csv':
+    if kind in ['gz', 'csv', 'zip']:
         dtypes_1 = {
             'key': np.int,
             'serial_number': str,
@@ -91,7 +92,7 @@ def load_raw_file(filename, kind='csv'):
         df = pd.read_pickle(filename)
     return df
 
-def summarize_files(file_path, suffix='gz', verbose=False):
+def summarize_files(file_path, suffix='gz', verbose=False, testing=False):
     '''
     Provide a high-level summary of all files in directory. Calls data_summary()
     :param file_path: a string containing the path to the directory containing the files to be summarized
@@ -103,18 +104,33 @@ def summarize_files(file_path, suffix='gz', verbose=False):
         file_path += '/'
     search = file_path + '*.' + suffix
     files = glob(search)
+    if testing:
+        files = files[5:10]
     data = {}
     N = len(files)
     if verbose:
         print '{} files to process'.format(N)
     for it, fn in enumerate(files):
-        df = load_raw_file(fn)
+        df = load_raw_file(fn, kind=suffix)
         summary = data_summary(df)
-        data[fn] = summary
+        name = fn.split('/')[-1]
+        name = name.split('.')[0]
+        split_name = name.split('_')
+        key = split_name[0] + '_' + split_name[2]
+        data[key] = summary
         if verbose:
-            print '{}/{} complete:'.format(it+1, N), fn.split('/')[-1]
-    df = pd.DataFrame(data=data)
-    return df.T
+            print '{}/{} complete:'.format(it+1, N), name
+    key_pairs = [(key, k) for key, val in data.iteritems() for k in val.keys()]
+    new_keys = [tup[0] + '_' + tup[1] for tup in key_pairs]
+    new_data = {}
+    it = 0
+    for val in data.itervalues():
+        for inner in val.itervalues():
+            new_data[new_keys[it]] = inner
+            it += 1
+    df = pd.DataFrame.from_dict(new_data, orient='index')
+    df = df[['t_start', 't_end', 'num_vals', 'ac_max', 'ac_min', 'ac_avg', 'ac_stdev']]
+    return df
 
 def pickle_files(file_path, suffix='gz', verbose=False):
     '''
@@ -142,4 +158,5 @@ def pickle_files(file_path, suffix='gz', verbose=False):
 
 if __name__ == "__main__":
     path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
-    summary = summarize_files(path_to_files)
+    summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
+    print summary
