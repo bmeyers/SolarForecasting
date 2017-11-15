@@ -19,7 +19,8 @@ def data_summary(df):
     serial_numbers = set(df['serial_number'])
     output = {}
     for sn in serial_numbers:
-        df_view = df[df['serial_number'] == sn].dropna()
+        df_view = df[df['serial_number'] == sn]
+        df_view = df_view[pd.notnull(df_view['ac_power'])]
         if len(df_view) != 0:
             tstart = df['timestamp'].iloc[0]
             tend = df['timestamp'].iloc[-1]
@@ -105,30 +106,23 @@ def summarize_files(file_path, suffix='gz', verbose=False, testing=False):
     search = file_path + '*.' + suffix
     files = glob(search)
     if testing:
-        files = files[5:10]
+        files = files[:40]
     data = {}
     N = len(files)
-    if verbose:
-        print '{} files to process'.format(N)
+    print '{} files to process'.format(N)
     for it, fn in enumerate(files):
         df = load_raw_file(fn, kind=suffix)
         summary = data_summary(df)
         name = fn.split('/')[-1]
         name = name.split('.')[0]
         split_name = name.split('_')
-        key = split_name[0] + '_' + split_name[2]
-        data[key] = summary
+        key_base = split_name[0] + '_' + split_name[2]
+        for key, val in summary.iteritems():
+            full_key = key_base + '_' + str(key)
+            data[full_key] = val
         if verbose:
             print '{}/{} complete:'.format(it+1, N), name
-    key_pairs = [(key, k) for key, val in data.iteritems() for k in val.keys()]
-    new_keys = [tup[0] + '_' + tup[1] for tup in key_pairs]
-    new_data = {}
-    it = 0
-    for val in data.itervalues():
-        for inner in val.itervalues():
-            new_data[new_keys[it]] = inner
-            it += 1
-    df = pd.DataFrame.from_dict(new_data, orient='index')
+    df = pd.DataFrame.from_dict(data, orient='index')
     df = df[['t_start', 't_end', 'num_vals', 'ac_max', 'ac_min', 'ac_avg', 'ac_stdev']]
     return df
 
