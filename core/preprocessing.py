@@ -38,61 +38,65 @@ def data_summary(df):
         }
     return output
 
-def load_raw_file(filename):
+def load_raw_file(filename, kind='csv'):
     '''
     Because of explicit dtype handling, this will only work on type-130 raw SunPower data files. Handles CSVs and
     compressed CSVs, including .gz and .zip
     :param filename: the file path to a SunPower type-130 raw data file
     :return: a pandas
     '''
-    dtypes_1 = {
-        'key': np.int,
-        'serial_number': str,
-        'inverter_serial_number': str,
-        'hardware_version': str,
-        'software_version': np.float,
-        'inverter_model_number': str,
-        'model_d1': str,
-        'model_d2': np.float,
-        'energy_harvested_today': np.float,
-        'energy_harvested_total': np.float,
-        'dc_voltage': np.float,
-        'dc_current': np.float,
-        'dc_power': np.float,
-        'ac_voltage': np.float,
-        'ac_current': np.float,
-        'ac_power': np.float,
-        'ac_frequency': np.float,
-        'heatsink_temp': np.float
-    }
-    dtypes_2 = {
-        'key': np.int,
-        'serial_number': str,
-        'model_name': str,
-        'energy_day': np.float,
-        'energy_total': np.float,
-        'ac_power': np.float,
-        'ac_volt': np.float,
-        'ac_curr': np.float,
-        'dc_power': np.float,
-        'dc_volt': np.float,
-        'dc_curr': np.float,
-        'heatsink_temp': np.float,
-        'freq': np.float,
-        'inverter_status': int
-    }
-    df = pd.read_csv(filename, index_col=False, parse_dates=[1], na_values=['XXXXXXX'])
-    try:
-        df.astype(dtypes_1)
-    except KeyError:
-        df.astype(dtypes_2)
+    if kind == 'csv':
+        dtypes_1 = {
+            'key': np.int,
+            'serial_number': str,
+            'inverter_serial_number': str,
+            'hardware_version': str,
+            'software_version': np.float,
+            'inverter_model_number': str,
+            'model_d1': str,
+            'model_d2': np.float,
+            'energy_harvested_today': np.float,
+            'energy_harvested_total': np.float,
+            'dc_voltage': np.float,
+            'dc_current': np.float,
+            'dc_power': np.float,
+            'ac_voltage': np.float,
+            'ac_current': np.float,
+            'ac_power': np.float,
+            'ac_frequency': np.float,
+            'heatsink_temp': np.float
+        }
+        dtypes_2 = {
+            'key': np.int,
+            'serial_number': str,
+            'model_name': str,
+            'energy_day': np.float,
+            'energy_total': np.float,
+            'ac_power': np.float,
+            'ac_volt': np.float,
+            'ac_curr': np.float,
+            'dc_power': np.float,
+            'dc_volt': np.float,
+            'dc_curr': np.float,
+            'heatsink_temp': np.float,
+            'freq': np.float,
+            'inverter_status': int
+        }
+        df = pd.read_csv(filename, index_col=False, parse_dates=[1], na_values=['XXXXXXX'])
+        try:
+            df.astype(dtypes_1)
+        except KeyError:
+            df.astype(dtypes_2)
+    elif kind == 'pkl':
+        df = pd.read_pickle(filename)
     return df
 
 def summarize_files(file_path, suffix='gz', verbose=False):
     '''
-
+    Provide a high-level summary of all files in directory. Calls data_summary()
     :param file_path: a string containing the path to the directory containing the files to be summarized
-    :param type: options are 'gz', 'zip', or 'csv'
+    :param suffix: options are 'gz', 'zip', 'csv', or 'pkl'
+    ;param verbose: boolean to print progress
     :return: a pandas dataframe with the summary of the files
     '''
     if not file_path[-1] == '/':
@@ -111,6 +115,30 @@ def summarize_files(file_path, suffix='gz', verbose=False):
             print '{}/{} complete:'.format(it+1, N), fn.split('/')[-1]
     df = pd.DataFrame(data=data)
     return df.T
+
+def pickle_files(file_path, suffix='gz', verbose=False):
+    '''
+    Parse files with pandas and save as pickles for faster access in the future
+    :param file_path: a string containing the path to the directory containing the files to be summarized
+    :param suffix: options are 'gz', 'zip', or 'csv'
+    ;param verbose: boolean to print progress
+    :return:
+    '''
+    if not file_path[-1] == '/':
+        file_path += '/'
+    search = file_path + '*.' + suffix
+    files = glob(search)
+    N = len(files)
+    if verbose:
+        print '{} files to process'.format(N)
+    for it, fn in enumerate(files):
+        df = load_raw_file(fn)
+        name = fn.split('/')[-1]
+        name = name.split('.')[0]
+        save_path = file_path + name + '.pkl'
+        df.to_pickle(save_path)
+        if verbose:
+            print '{}/{} complete:'.format(it+1, N), name
 
 if __name__ == "__main__":
     path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
