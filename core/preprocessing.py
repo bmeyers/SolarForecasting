@@ -45,7 +45,7 @@ def load_raw_file(filename):
     :param filename: the file path to a SunPower type-130 raw data file
     :return: a pandas
     '''
-    df = pd.read_csv(files[0], index_col=False, parse_dates=[1])
+    df = pd.read_csv(filename, index_col=False, parse_dates=[1])
     return df
 
 def summarize_files(file_path, suffix='gz', verbose=False):
@@ -71,3 +71,7 @@ def summarize_files(file_path, suffix='gz', verbose=False):
             print '{}/{} complete:'.format(it+1, N), fn.split('/')[-1]
     df = pd.DataFrame(data=data)
     return df.T
+
+if __name__ == "__main__":
+    path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
+    summary = summarize_files(path_to_files)
