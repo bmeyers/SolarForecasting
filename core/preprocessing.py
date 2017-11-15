@@ -45,7 +45,29 @@ def load_raw_file(filename):
     :param filename: the file path to a SunPower type-130 raw data file
     :return: a pandas
     '''
-    df = pd.read_csv(filename, index_col=False, parse_dates=[1])
+    dtypes = {
+        'key': np.int,
+        'timestamp': str,
+        'serial_number': str,
+        'inverter_serial_number': str,
+        'hardware_version': str,
+        'software_version': np.float,
+        'inverter_model_number': str,
+        'model_d1': str,
+        'model_d2': np.float,
+        'energy_harvested_today': np.float,
+        'energy_harvested_total': np.float,
+        'dc_voltage': np.float,
+        'dc_current': np.float,
+        'dc_power': np.float,
+        'ac_voltage': np.float,
+        'ac_current': np.float,
+        'ac_power': np.float,
+        'ac_frequency': np.float,
+        'heatsink_temp': np.float
+    }
+    df = pd.read_csv(filename, index_col=False, parse_dates=[1], na_values=['XXXXXXX'])
+    df.astype(dtypes)
     return df
 
 def summarize_files(file_path, suffix='gz', verbose=False):
