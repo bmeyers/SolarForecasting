@@ -1,0 +1,6 @@
+# Datafiles
+*.csv
+*.gz
+
+# Compiled Python
+*.pyc
