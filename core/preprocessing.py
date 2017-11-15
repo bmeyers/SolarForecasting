@@ -34,13 +34,13 @@ def data_summary(df):
             'ac_max': ac_max,
             'ac_min': ac_min,
             'ac_avg': ac_avg,
-            'stdev': ac_stdev
+            'ac_stdev': ac_stdev
         }
     return output
 
 def load_raw_file(filename):
     '''
-    Might work on other types on SunPower files. Probably won't do the right thing on ther files. Handles CSVs and
+    Because of explicit dtype handling, this will only work on type-130 raw SunPower data files. Handles CSVs and
     compressed CSVs, including .gz and .zip
     :param filename: the file path to a SunPower type-130 raw data file
     :return: a pandas
