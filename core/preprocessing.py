@@ -5,6 +5,7 @@ This module contains classes and functions for pre-processing data and initial d
 
 import numpy as np
 import pandas as pd
+from glob import glob
 
 def data_summary(df):
     '''
@@ -39,10 +40,34 @@ def data_summary(df):
 
 def load_raw_file(filename):
     '''
-
+    Might work on other types on SunPower files. Probably won't do the right thing on ther files. Handles CSVs and
+    compressed CSVs, including .gz and .zip
     :param filename: the file path to a SunPower type-130 raw data file
     :return: a pandas
     '''
     df = pd.read_csv(files[0], index_col=False, parse_dates=[1])
     return df
 
+def summarize_files(file_path, suffix='gz', verbose=False):
+    '''
+
+    :param file_path: a string containing the path to the directory containing the files to be summarized
+    :param type: options are 'gz', 'zip', or 'csv'
+    :return: a pandas dataframe with the summary of the files
+    '''
+    if not file_path[-1] == '/':
+        file_path += '/'
+    search = file_path + '*.' + suffix
+    files = glob(search)
+    data = {}
+    N = len(files)
+    if verbose:
+        print '{} files to process'.format(N)
+    for it, fn in enumerate(files):
+        df = load_raw_file(fn)
+        summary = data_summary(df)
+        data[fn] = summary
+        if verbose:
+            print '{}/{} complete:'.format(it+1, N), fn.split('/')[-1]
+    df = pd.DataFrame(data=data)
+    return df.T
