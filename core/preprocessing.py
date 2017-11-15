@@ -4,12 +4,13 @@ This module contains classes and functions for pre-processing data and initial d
 """
 
 import numpy as np
+import pandas as pd
 
-def parse_data_range(df):
+def data_summary(df):
     '''
     This function accepts a Pandas dataframe generated from a SunPower type-130 data file.
     :param df: Pandas dataframe
-    :return: a dictionary containing the starting timestamp, end timestamp, and number of non-null data
+    :return: a dictionary containing the starting timestamp, end timestamp, number of non-null data
              points, and the max, min, average, and standard deviation of the AC power column for every inverter serial
              number in the file
     '''
@@ -36,6 +37,12 @@ def parse_data_range(df):
         }
     return output
 
+def load_raw_file(filename):
+    '''
 
-
+    :param filename: the file path to a SunPower type-130 raw data file
+    :return: a pandas
+    '''
+    df = pd.read_csv(files[0], index_col=False, parse_dates=[1])
+    return df
 
