@@ -7,6 +7,10 @@ import numpy as np
 import pandas as pd
 from glob import glob
 
+TRAIN = ('2015-7-15', '2016-11-25') # 500 days
+DEV = ('2016-11-26', '2017-3-15')   # 110 days
+TEST = ('2017-3-16', '2017-07-14')  # 121 days
+
 def data_summary(df):
     '''
     This function accepts a Pandas dataframe generated from a SunPower type-130 data file.
@@ -204,6 +208,21 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
     output['total_power'] = total_power
     output.index = output.index + pd.Timedelta(hours=-8) # Localize time to UTC-8
     return output, site_keys
+
+def train_dev_test_split(df, train=TRAIN, dev=DEV, test=TEST):
+    if train is not None:
+        df_train = df.loc[train[0]:train[1]]
+    else:
+        df_train = None
+    if dev is not None:
+        df_dev = df.loc[dev[0]:dev[1]]
+    else:
+        df_dev = None
+    if test is not None:
+        df_test = df.loc[test[0]:test[1]]
+    else:
+        df_test = None
+    return [item for item in [df_train, df_dev, df_test] if item is not None]
 
 
 if __name__ == "__main__":
