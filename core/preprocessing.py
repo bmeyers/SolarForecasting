@@ -210,6 +210,16 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
     return output, site_keys
 
 def train_dev_test_split(df, train=TRAIN, dev=DEV, test=TEST):
+    '''
+    A helper function for doing train, dev, test splitting. The standard date ranges are the defaults. Set a kwarg to
+    None to suppress the return of that subset. For instance, if you are doing model training, you probably don't need
+    the test set until the very end.
+    :param df: A dataframe. Should probably be the master dataset and nothing else
+    :param train: a tuple containing the start and end days of the train period
+    :param dev: a tuple containing the start and end days of the dev period
+    :param test: a tuple containing the start and end days of the test period
+    :return: a list of split dataframes
+    '''
     if train is not None:
         df_train = df.loc[train[0]:train[1]]
     else:
