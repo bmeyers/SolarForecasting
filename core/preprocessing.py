@@ -154,6 +154,18 @@ def pickle_files(file_path, suffix='gz', verbose=False):
         if verbose:
             print '{}/{} complete:'.format(it+1, N), name
 
+def generate_master_dataset(site_ids, file_path, suffix='pkl'):
+    '''
+
+    :param site_keys:
+    :param file_path:
+    :param suffix:
+    :return:
+    '''
+    if isinstance(site_ids, str):
+        site_ids = np.genfromtxt('data/selected_sites.txt', dtype=str)
+    pass
+
 if __name__ == "__main__":
     path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
     summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
