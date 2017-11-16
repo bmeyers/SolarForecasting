@@ -156,14 +156,18 @@ def pickle_files(file_path, suffix='gz', verbose=False):
 
 def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
     '''
-
-    :param site_keys:
-    :param file_path:
-    :param suffix:
-    :return:
+    Parse the files associated with a list of site ids, combining AC power from all inverters at each site into a single
+    data frame with a regular time-series index.
+    :param site_keys: either an interable of site keys or a file path to a text file with the list
+    :param file_path: file path to the raw data files
+    :param suffix: 'pkl' is fastest. use 'csv' for original files
+    :param verbose: boolean to print progress
+    :return: the processed dataframe and a list of site key, name pairs
     '''
+    # duck typing for file path or iterable
     if isinstance(site_ids, str):
         site_ids = np.genfromtxt(site_ids, dtype=str)
+    # set the master time index that all data will match to
     time_index = pd.date_range(start='2015-07-15', end='2017-07-16', freq='5min')
     site_keys = []
     site_keys_a = site_keys.append
@@ -176,13 +180,16 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
         fp = glob(file_path + '*' + id +'*' + suffix)[0]
         df = load_raw_file(fp, kind=suffix)
         serial_numbers = set(df['serial_number'])
+        # some sites have more than one inverter
         for sn in serial_numbers:
             df_view = df[df['serial_number'] == sn]
-            df_view = df_view[pd.notnull(df_view['ac_power'])]
-            df_view.set_index('timestamp', inplace=True)
-            df_view.sort_index(inplace=True)
-            df_view = df_view[~df_view.index.duplicated(keep='first')]
-            df_view.reindex(index=time_index).interpolate()
+            ############## data cleaning ####################################
+            df_view = df_view[pd.notnull(df_view['ac_power'])]              # Drop records with nulls in ac_power
+            df_view.set_index('timestamp', inplace=True)                    # Make the timestamp column the index
+            df_view.sort_index(inplace=True)                                # Sort on time
+            df_view = df_view[~df_view.index.duplicated(keep='first')]      # Drop duplicate times
+            df_view.reindex(index=time_index).interpolate()                 # Match the master index, interp missing
+            #################################################################
             col_id = str(id) + '_' + str(sn)
             col_name = 'S{:02}'.format(counter)
             output[col_name] = df_view['ac_power']
