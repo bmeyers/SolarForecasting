@@ -186,8 +186,11 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
             col_id = str(id) + '_' + str(sn)
             col_name = 'S{:02}'.format(counter)
             output[col_name] = df_view['ac_power']
-            site_keys_a((col_id, col_name))
-            counter += 1
+            if output[col_name].count() > 200: # final filter on low data count relative to time index
+                site_keys_a((col_id, col_name))
+                counter += 1
+            else:
+                del output[col_name]
         if verbose:
             print '{}/{} complete:'.format(it+1, N), id
     total_power = np.sum(output, axis=1)
