@@ -195,6 +195,7 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
             print '{}/{} complete:'.format(it+1, N), id
     total_power = np.sum(output, axis=1)
     output['total_power'] = total_power
+    output.index = output.index + pd.Timedelta(hours=-8) # Localize time to UTC-8
     return output, site_keys
 
 
