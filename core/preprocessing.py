@@ -154,7 +154,7 @@ def pickle_files(file_path, suffix='gz', verbose=False):
         if verbose:
             print '{}/{} complete:'.format(it+1, N), name
 
-def generate_master_dataset(site_ids, file_path, suffix='pkl'):
+def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
     '''
 
     :param site_keys:
@@ -163,10 +163,42 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl'):
     :return:
     '''
     if isinstance(site_ids, str):
-        site_ids = np.genfromtxt('data/selected_sites.txt', dtype=str)
-    pass
+        site_ids = np.genfromtxt(site_ids, dtype=str)
+    time_index = pd.date_range(start='2015-07-15', end='2017-07-16', freq='5min')
+    site_keys = []
+    site_keys_a = site_keys.append
+    output = pd.DataFrame(index=time_index)
+    counter = 1
+    N = len(site_ids)
+    if verbose:
+        print '{} files to process'.format(N)
+    for it, id in enumerate(site_ids):
+        fp = glob(file_path + '*' + id +'*' + suffix)[0]
+        df = load_raw_file(fp, kind=suffix)
+        serial_numbers = set(df['serial_number'])
+        for sn in serial_numbers:
+            df_view = df[df['serial_number'] == sn]
+            df_view = df_view[pd.notnull(df_view['ac_power'])]
+            df_view.set_index('timestamp', inplace=True)
+            df_view.sort_index(inplace=True)
+            df_view = df_view[~df_view.index.duplicated(keep='first')]
+            df_view.reindex(index=time_index).interpolate()
+            col_id = str(id) + '_' + str(sn)
+            col_name = 'S{:02}'.format(counter)
+            output[col_name] = df_view['ac_power']
+            site_keys_a((col_id, col_name))
+            counter += 1
+        if verbose:
+            print '{}/{} complete:'.format(it+1, N), id
+    total_power = np.sum(output, axis=1)
+    output['total_power'] = total_power
+    return output, site_keys
+
 
 if __name__ == "__main__":
     path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
-    summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
-    print summary
+    site_ids = '/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/selected_sites.txt'
+    # summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
+    # print summary
+    df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
+    print keys
