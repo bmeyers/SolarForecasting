@@ -1,6 +1,7 @@
 # Datafiles
 *.csv
 *.gz
+*.pkl
 
 # Compiled Python
 *.pyc
