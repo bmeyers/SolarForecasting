@@ -234,6 +234,40 @@ def train_dev_test_split(df, train=TRAIN, dev=DEV, test=TEST):
         df_test = None
     return [item for item in [df_train, df_dev, df_test] if item is not None]
 
+def make_small_train(df, kind='mixed'):
+    if kind == 'sunny':
+        start = '2016-4-11'
+        end = '2016-4-20'
+    elif kind == 'cloudy':
+        start = '2016-1-13'
+        end = '2016-1-22'
+    elif kind == 'mixed':
+        start = '2015-10-9'
+        end = '2015-10-18'
+    elif kind == 'combined':
+        s = df.loc['2016-4-11':'2016-4-20']
+        c = df.loc['2016-1-13':'2016-1-22']
+        m = df.loc['2015-10-9':'2015-10-18']
+        start = None
+    if start is not None:
+        output = df.loc[start:end]
+    else:
+        output = pd.concat([s, c, m])
+        start = output.index[0]
+        ts = pd.date_range(start.date(), periods=len(output), freq='5min')
+        output.index = ts
+    return output
+
+def make_small_dev(df):
+    cloudy = df.loc['2017-02-25':'2017-2-28']
+    sunny = df.loc['2017-03-6':'2017-3-9']
+    output = pd.concat([sunny, cloudy], axis=0)
+    start = output.index[0]
+    ts = pd.date_range(start.date(), periods=len(output), freq='5min')
+    output.index = ts
+    return output
+
+
 
 if __name__ == "__main__":
     path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
