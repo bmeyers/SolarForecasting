@@ -140,6 +140,10 @@ class SumToSumARIMA(object):
                 residuals = np.r_[residuals, r]
         return np.sum(np.power(residuals, 2)) / np.float(len(residuals))
 
+class FunctionalRegression(object):
+    def __init__(self, df):
+        pass
+
 if __name__ == "__main__":
     df = pd.read_pickle('/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/master_dataset.pkl')
     df.fillna(0, inplace=True)
