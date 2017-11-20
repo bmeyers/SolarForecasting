@@ -3,6 +3,7 @@
 This module contains classes and functions for pre-processing data and initial data selection.
 """
 
+from utilities import envelope_fit
 import numpy as np
 from numpy.linalg import svd
 import cvxpy as cvx
@@ -20,6 +21,7 @@ class StatisticalClearSky(object):
         self.U = None
         self.D = None
         self.P = None
+        self.DP_clearsky = None
 
     def get_eigenvectors(self):
         data_matrix = self.data.as_matrix().reshape(-1, 288).T
@@ -30,11 +32,42 @@ class StatisticalClearSky(object):
         self.data = data_matrix
 
     def reconstruct_day(self, day=20, n=100, plot=True):
+        if self.U is None:
+            self.get_eigenvectors()
         if plot:
             plt.plot(self.data[:, day])
             plt.plot(self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day]))
         else:
             return self.data[:, day], self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day])
+
+    def make_clearsky_model(self, plot=False):
+        if self.U is None:
+            self.get_eigenvectors()
+        daily_scale_factors = ((np.diag(self.D).dot(self.P[:288])))
+        signal1 = daily_scale_factors[0, :]
+        envelope1 = envelope_fit(signal1, mu=10**(2.6), eta=10**(-.5), kind='lower', period=365)
+        signal2 = daily_scale_factors[1, :]
+        envelope2 = envelope_fit(signal2, mu=10 ** (2), eta=10 ** (-.75), kind='upper', period=365)
+        self.DP_clearsky = np.c_[envelope1, envelope2].T[:, :365]
+        if plot:
+            fig, axes = plt.subplots(nrows=2)
+            axes[0].plot(signal1)
+            axes[0].plot(envelope1)
+            axes[1].plot(signal2)
+            axes[1].plot(envelope2)
+            return fig
+
+    def estimate_clearsky(self, day_slice):
+        '''
+        Make a clearsky estimate based on provided data for a given set of days
+        :param day_slice: A numpy.slice object indicating the days to be used in the estimation (see: numpy.s_)
+        :return: A matrix of daily clear sky estimates. The columns are individual days and the rows 5-minute
+        time periods
+        '''
+        if self.DP_clearsky is None:
+            self.make_clearsky_model()
+        clearsky = self.U[:, :2].dot(self.DP_clearsky[:, day_slice])
+        return clearsky
 
 
 def data_summary(df):
