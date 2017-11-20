@@ -9,3 +9,5 @@
 # Local Preferences
 *.SUNet
 .idea/workspace.xml
+.ipynb_checkpoints
+logs
