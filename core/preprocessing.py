@@ -3,7 +3,7 @@
 This module contains classes and functions for pre-processing data and initial data selection.
 """
 
-from .utilities import envelope_fit
+from core.utilities import envelope_fit
 import numpy as np
 from numpy.linalg import svd
 import cvxpy as cvx
