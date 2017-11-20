@@ -6,6 +6,7 @@ This module contains utility functions and classes.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import cvxpy as cvx
 
 def plot_forecasts(test, forecasts, ax=None):
     '''
@@ -40,3 +41,33 @@ def calc_test_mse(test, forecasts):
             r = join['total_power'] - join[0]
             residuals = np.r_[residuals, r]
     return np.sum(np.power(residuals, 2)) / np.float(len(residuals))
+
+def envelope_fit(signal, mu, eta, kind='upper'):
+    '''
+    Perform an envelope fit of a signal. See: https://en.wikipedia.org/wiki/Envelope_(waves)
+    :param signal: The signal to be fit
+    :param mu: A parameter to control the overall stiffness of the fit
+    :param eta: A parameter to control the permeability of the envelope. A large value result in
+    no data points outside the fitted envelope
+    :param kind: 'upper' or 'lower'
+    :return: An envelope signal of the same length as the input
+    '''
+    if kind == 'lower':
+        signal *= -1
+    n_samples = len(signal)
+    envelope = cvx.Variable(len(signal))
+    mu = cvx.Parameter(sign='positive', value=mu)
+    eta = cvx.Parameter(sign='positive', value=eta)
+    cost = (cvx.norm2(envelope - signal) +
+            mu * cvx.norm2(envelope[2:] - 2 * envelope[1:-1] + envelope[:-2]) +
+            eta * cvx.norm1(cvx.max_elemwise(signal - envelope, 0)))
+    objective = cvx.Minimize(cost)
+    constraints = [
+        envelope[:n_samples - 365] == envelope[365:]
+    ]
+    problem = cvx.Problem(objective, constraints)
+    problem.solve()
+    if kind == 'upper':
+        return envelope.value.A1
+    elif kind == 'lower':
+        return -envelope.value.A1
