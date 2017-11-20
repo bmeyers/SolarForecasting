@@ -70,4 +70,5 @@ def envelope_fit(signal, mu, eta, kind='upper'):
     if kind == 'upper':
         return envelope.value.A1
     elif kind == 'lower':
+        signal *= -1
         return -envelope.value.A1
