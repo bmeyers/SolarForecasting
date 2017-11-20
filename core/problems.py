@@ -2,10 +2,12 @@
 """
 This module contains problem types that we are planning to address.
 """
+from utilities import plot_forecasts, calc_test_mse
 import numpy as np
 import pandas as pd
 from numpy.linalg import norm
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+import matplotlib.pyplot as plt
 
 class ManyToOneRegression(object):
     '''
@@ -192,7 +194,9 @@ class FunctionalRegression(object):
                 den += k
             est = pd.Series(data=(num / den), index=self.test_response_ts[j])
             forecasts_a(est)
-        self.forecasts = forecasts
+        # Cast the forecasts as Pandas Series with time indices
+        foo = [pd.Series(data=f, index=self.test_response_ts[ind]) for ind, f in enumerate(forecasts)]
+        self.forecasts = foo
 
     def calc_distance(self, feature1, feature2):
         residual = feature1 - feature2
@@ -216,21 +220,12 @@ class FunctionalRegression(object):
             return output
 
     def plot_test(self, start=None, end=None):
-        self.test.plot(y='total_power', linewidth=1.5, ls=':')
-        for ind, f in enumerate(self.forecasts):
-            series = pd.Series(data=f, index=self.test_response_ts[ind])
-            series.plot(linewidth=1)
+        plot_forecasts(self.test, self.forecasts)
 
 
     def calc_mse(self):
-        residuals = np.array([])
-        for f in self.forecasts:
-            join = pd.concat([f, self.test], axis=1).dropna()
-            if np.max(join['total_power']) > 0:
-                r = join['total_power'] - join[0]
-                residuals = np.r_[residuals, r]
-        return np.sum(np.power(residuals, 2)) / np.float(len(residuals))
-
+        mse = calc_test_mse(self.test, self.forecasts)
+        return mse
 
 
 if __name__ == "__main__":

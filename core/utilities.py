@@ -18,8 +18,7 @@ def plot_forecasts(test, forecasts, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
     test.plot(y='total_power', linewidth=1.5, ls=':', ax=ax)
-    for ind, f in enumerate(forecasts):
-        series = pd.Series(data=f, index=self.test_response_ts[ind])
+    for series in forecasts:
         series.plot(linewidth=1, ax=ax)
     if ax is None:
         return fig
