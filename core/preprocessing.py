@@ -3,7 +3,7 @@
 This module contains classes and functions for pre-processing data and initial data selection.
 """
 
-from utilities import envelope_fit
+from .utilities import envelope_fit
 import numpy as np
 from numpy.linalg import svd
 import cvxpy as cvx
@@ -176,7 +176,7 @@ def summarize_files(file_path, suffix='gz', verbose=False, testing=False):
         files = files[:40]
     data = {}
     N = len(files)
-    print '{} files to process'.format(N)
+    print('{} files to process'.format(N))
     for it, fn in enumerate(files):
         df = load_raw_file(fn, kind=suffix)
         summary = data_summary(df)
@@ -188,7 +188,7 @@ def summarize_files(file_path, suffix='gz', verbose=False, testing=False):
             full_key = key_base + '_' + str(key)
             data[full_key] = val
         if verbose:
-            print '{}/{} complete:'.format(it+1, N), name
+            print('{}/{} complete:'.format(it+1, N), name)
     df = pd.DataFrame.from_dict(data, orient='index')
     df = df[['t_start', 't_end', 'num_vals', 'ac_max', 'ac_min', 'ac_avg', 'ac_stdev']]
     df.reset_index(inplace=True)
@@ -211,7 +211,7 @@ def pickle_files(file_path, suffix='gz', verbose=False):
     files = glob(search)
     N = len(files)
     if verbose:
-        print '{} files to process'.format(N)
+        print('{} files to process'.format(N))
     for it, fn in enumerate(files):
         df = load_raw_file(fn)
         name = fn.split('/')[-1]
@@ -219,7 +219,7 @@ def pickle_files(file_path, suffix='gz', verbose=False):
         save_path = file_path + name + '.pkl'
         df.to_pickle(save_path)
         if verbose:
-            print '{}/{} complete:'.format(it+1, N), name
+            print('{}/{} complete:'.format(it+1, N), name)
 
 def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
     '''
@@ -242,7 +242,7 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
     counter = 1
     N = len(site_ids)
     if verbose:
-        print '{} files to process'.format(N)
+        print('{} files to process'.format(N))
     for it, id in enumerate(site_ids):
         fp = glob(file_path + '*' + id +'*' + suffix)[0]
         df = load_raw_file(fp, kind=suffix)
@@ -266,7 +266,7 @@ def generate_master_dataset(site_ids, file_path, suffix='pkl', verbose=False):
             else:
                 del output[col_name]
         if verbose:
-            print '{}/{} complete:'.format(it+1, N), id
+            print('{}/{} complete:'.format(it+1, N), id)
     total_power = np.sum(output, axis=1)
     output['total_power'] = total_power
     output.index = output.index + pd.Timedelta(hours=-8) # Localize time to UTC-8
@@ -337,4 +337,4 @@ if __name__ == "__main__":
     # summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
     # print summary
     df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
-    print keys
+    print(keys)
