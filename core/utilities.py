@@ -42,7 +42,7 @@ def calc_test_mse(test, forecasts):
             residuals = np.r_[residuals, r]
     return np.sum(np.power(residuals, 2)) / np.float(len(residuals))
 
-def envelope_fit(signal, mu, eta, kind='upper'):
+def envelope_fit(signal, mu, eta, kind='upper', period=None):
     '''
     Perform an envelope fit of a signal. See: https://en.wikipedia.org/wiki/Envelope_(waves)
     :param signal: The signal to be fit
@@ -62,9 +62,10 @@ def envelope_fit(signal, mu, eta, kind='upper'):
             mu * cvx.norm2(envelope[2:] - 2 * envelope[1:-1] + envelope[:-2]) +
             eta * cvx.norm1(cvx.max_elemwise(signal - envelope, 0)))
     objective = cvx.Minimize(cost)
-    constraints = [
-        envelope[:n_samples - 365] == envelope[365:]
-    ]
+    if period is not None:
+        constraints = [
+            envelope[:n_samples - period] == envelope[period:]
+        ]
     problem = cvx.Problem(objective, constraints)
     problem.solve()
     if kind == 'upper':
