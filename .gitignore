@@ -7,4 +7,5 @@
 *.pyc
 
 # Local Preferences
+*.SUNet
 .idea/workspace.xml
