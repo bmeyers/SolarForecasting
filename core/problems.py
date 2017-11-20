@@ -2,7 +2,7 @@
 """
 This module contains problem types that we are planning to address.
 """
-from utilities import plot_forecasts, calc_test_mse
+from core.utilities import plot_forecasts, calc_test_mse
 import numpy as np
 import pandas as pd
 from numpy.linalg import norm
@@ -96,7 +96,10 @@ class SumToSumARIMA(object):
             self.train_start = start
             self.train_end = end
         self.order = order
-        train = self.df.loc[self.train_start:self.train_end]['total_power']
+        if start is None and end is None:
+            train = self.df['total_power']
+        else:
+            train = self.df.loc[self.train_start:self.train_end]['total_power']
         model = SARIMAX(train, order=order, seasonal_order=seasonal_order,
                         enforce_invertibility=False, enforce_stationarity=False, maxiter=maxiter)
         fit = model.fit(method=method)
