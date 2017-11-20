@@ -4,12 +4,38 @@ This module contains classes and functions for pre-processing data and initial d
 """
 
 import numpy as np
+from numpy.linalg import svd
+import cvxpy as cvx
 import pandas as pd
 from glob import glob
+import matplotlib.pyplot as plt
 
 TRAIN = ('2015-7-15', '2016-11-25') # 500 days
 DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
+
+class StatisticalClearSky(object):
+    def __init__(self, data):
+        self.data = data
+        self.U = None
+        self.D = None
+        self.P = None
+
+    def get_eigenvectors(self):
+        data_matrix = self.data.as_matrix().reshape(-1, 288).T
+        U, D, P = svd(data_matrix)
+        self.U = U
+        self.D = D
+        self.P = P
+        self.data = data_matrix
+
+    def reconstruct_day(self, day=20, n=100, plot=True):
+        if plot:
+            plt.plot(self.data[:, day])
+            plt.plot(self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day]))
+        else:
+            return self.data[:, day], self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day])
+
 
 def data_summary(df):
     '''
@@ -233,6 +259,39 @@ def train_dev_test_split(df, train=TRAIN, dev=DEV, test=TEST):
     else:
         df_test = None
     return [item for item in [df_train, df_dev, df_test] if item is not None]
+
+def make_small_train(df, kind='mixed'):
+    if kind == 'sunny':
+        start = '2016-4-11'
+        end = '2016-4-20'
+    elif kind == 'cloudy':
+        start = '2016-1-13'
+        end = '2016-1-22'
+    elif kind == 'mixed':
+        start = '2015-10-9'
+        end = '2015-10-18'
+    elif kind == 'combined':
+        s = df.loc['2016-4-11':'2016-4-20']
+        c = df.loc['2016-1-13':'2016-1-22']
+        m = df.loc['2015-10-9':'2015-10-18']
+        start = None
+    if start is not None:
+        output = df.loc[start:end]
+    else:
+        output = pd.concat([s, c, m])
+        start = output.index[0]
+        ts = pd.date_range(start.date(), periods=len(output), freq='5min')
+        output.index = ts
+    return output
+
+def make_small_dev(df):
+    cloudy = df.loc['2017-02-25':'2017-2-28']
+    sunny = df.loc['2017-03-6':'2017-3-9']
+    output = pd.concat([sunny, cloudy], axis=0)
+    start = output.index[0]
+    ts = pd.date_range(start.date(), periods=len(output), freq='5min')
+    output.index = ts
+    return output
 
 
 if __name__ == "__main__":
