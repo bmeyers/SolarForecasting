@@ -67,7 +67,7 @@ def envelope_fit(signal, mu, eta, kind='upper', period=None):
             envelope[:n_samples - period] == envelope[period:]
         ]
     problem = cvx.Problem(objective, constraints)
-    problem.solve()
+    problem.solve(solver='ECOS')
     if kind == 'upper':
         return envelope.value.A1
     elif kind == 'lower':
