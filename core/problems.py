@@ -130,18 +130,11 @@ class SumToSumARIMA(object):
         return
 
     def plot_test(self):
-        self.test_set.plot(linewidth=1.5, ls=':')
-        for f in self.forecasts:
-            f.plot(linewidth=1)
+        plot_forecasts(self.test_set, self.forecasts)
 
     def calc_mse(self):
-        residuals = np.array([])
-        for f in self.forecasts:
-            join = pd.concat([f, self.test_set], axis=1).dropna()
-            if np.max(join['total_power']) > 0:
-                r = join['total_power'] - join[0]
-                residuals = np.r_[residuals, r]
-        return np.sum(np.power(residuals, 2)) / np.float(len(residuals))
+        mse = calc_test_mse(self.test_set, self.forecasts)
+        return mse
 
 class FunctionalRegression(object):
     def __init__(self, train, test, window=12*5, future=12*3, train_selection='all', test_selection='hourly'):
