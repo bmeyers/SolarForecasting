@@ -15,6 +15,7 @@ class ManyToOneRegression(object):
     from many inverters to predict their aggregate in the future.
     '''
     def __init__(self, df, window=256, future=50):
+        assert len(df) >= window + future, "window + future size must be smaller than dataframe length"
         self.features = df.iloc[:,1:-1]
         self.response = df.iloc[:,-1]
         self.window = window
@@ -50,12 +51,17 @@ class ManyToOneRegression(object):
     def outputdim(self):
         return self.future
 
-    def sampler(self, batchsize=32):
+    def sampler(self, batchsize=None):
         '''
         This generator takes the dataset and produces a batch of training
         examples at random.
         '''
         nstamps, ninverters = self.features.shape
+
+        # create a batch of examples of the same size of the
+        # dataframe that we already know fits in memory
+        if batchsize is None:
+            batchsize = nstamps
 
         while True:
             X = []; Y = []
