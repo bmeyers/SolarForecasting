@@ -47,9 +47,9 @@ class StatisticalClearSky(object):
         signal1 = daily_scale_factors[0, :]
         envelope1 = envelope_fit(signal1, mu=mu, eta=eta, kind='lower', period=365)
         signal2 = daily_scale_factors[1, :]
-        envelope2 = envelope_fit(signal2, mu=10**(1.5), eta=10**(-10), kind='upper', period=365)
+        envelope2 = envelope_fit(signal2, mu=mu, eta=eta, kind='upper', period=365)
         signal3 = daily_scale_factors[2, :]
-        envelope3 = envelope_fit(signal3, mu=10**(1.5), eta=10**(-10), kind='lower', period=365)
+        envelope3 = envelope_fit(signal3, mu=10**(2.), eta=10**(-10), kind='upper', period=365)
         self.DP_clearsky = np.c_[envelope1, envelope2, envelope3].T[:, :365]
         if plot:
             fig, axes = plt.subplots(nrows=3, figsize=(12,10))
