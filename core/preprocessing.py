@@ -35,30 +35,33 @@ class StatisticalClearSky(object):
         if self.U is None:
             self.get_eigenvectors()
         if plot:
-            plt.plot(self.data[:, day])
-            plt.plot(self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day]))
+            plt.plot(self.data[:, day], linewidth=1)
+            plt.plot(self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day]), linewidth=1)
         else:
             return self.data[:, day], self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day])
 
-    def make_clearsky_model(self, mu=10**(3.), eta=10**(-1.), plot=False):
+    def make_clearsky_model(self, n=5, mu=10**(2.), eta=10**(-1.), plot=False):
         if self.U is None:
             self.get_eigenvectors()
         daily_scale_factors = ((np.diag(self.D).dot(self.P[:288])))
-        signal1 = daily_scale_factors[0, :]
-        envelope1 = envelope_fit(signal1, mu=mu, eta=eta, kind='lower', period=365)
-        signal2 = daily_scale_factors[1, :]
-        envelope2 = envelope_fit(signal2, mu=mu, eta=eta, kind='upper', period=365)
-        signal3 = daily_scale_factors[2, :]
-        envelope3 = envelope_fit(signal3, mu=10**(2.), eta=10**(-10), kind='upper', period=365)
-        self.DP_clearsky = np.c_[envelope1, envelope2, envelope3].T[:, :365]
+        signals = []
+        fits = np.empty((n, self.P.shape[1]))
+        for ind in xrange(n):
+            signal = daily_scale_factors[ind, :]
+            if ind == 0:
+                envelope = envelope_fit(signal, mu=mu, eta=eta, kind='lower', period=365)
+            elif ind == 1:
+                envelope = envelope_fit(signal, mu=mu, eta=10**(-10), kind='upper', period=365)
+            else:
+                envelope = envelope_fit(signal, mu=mu, eta=10**(-10), kind='upper', period=365)
+            signals.append(signal)
+            fits[ind, :] = envelope
+        self.DP_clearsky = fits[:, :365]
         if plot:
-            fig, axes = plt.subplots(nrows=3, figsize=(12,10))
-            axes[0].plot(signal1)
-            axes[0].plot(envelope1)
-            axes[1].plot(signal2)
-            axes[1].plot(envelope2)
-            axes[2].plot(signal3)
-            axes[2].plot(envelope3)
+            fig, axes = plt.subplots(nrows=n, figsize=(12,14))
+            for ind in xrange(n):
+                axes[ind].plot(signals[ind], linewidth=1)
+                axes[ind].plot(fits[ind], linewidth=1)
             return fig, axes
 
     def estimate_clearsky(self, day_slice):
@@ -70,7 +73,8 @@ class StatisticalClearSky(object):
         '''
         if self.DP_clearsky is None:
             self.make_clearsky_model()
-        clearsky = self.U[:, :3].dot(self.DP_clearsky[:, day_slice])
+        n = self.DP_clearsky.shape[0]
+        clearsky = self.U[:, :n].dot(self.DP_clearsky[:, day_slice])
         return clearsky.clip(min=0)
 
 
