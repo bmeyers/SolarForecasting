@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 TRAIN = ('2015-7-15', '2016-11-25') # 500 days
 DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
+DROP_LIST = [1, 2, 36, 37, 39, 41, 43, 65]
 
 class StatisticalClearSky(object):
     def __init__(self, data):
@@ -88,6 +89,36 @@ class StatisticalClearSky(object):
         n = self.DP_clearsky.shape[0]
         clearsky = self.U[:, :n].dot(self.DP_clearsky[:, day_slice])
         return clearsky.clip(min=0)
+
+
+def detrend_data(df, drop_bad_columns=True):
+    '''
+    Detrend a datafrane of time-series power data using the StatisticalClearSky class
+    :param df: A dataframe organized like the master dataset
+    :param drop_bad_columns: Set True to drop columns observed to have corrupted data
+    :return: A dataframe with daily and yearly periodic trends removed
+    '''
+    new_df = pd.DataFrame(index=df.index, columns=df.columns)
+    for i in xrange(1, 75):
+        if drop_bad_columns:
+            flag = (i not in DROP_LIST)
+        else:
+            flag = True
+        if flag:
+            if i == 74:
+                key = 'total_power'
+            else:
+                key = 'S{:02}'.format(i)
+            scs = StatisticalClearSky(df[key])
+            scs.make_clearsky_model(n=5, plot=False)
+            clearsky = scs.estimate_clearsky(np.s_[:])
+            clearsky = clearsky.ravel(order='F')
+            extended = np.empty(len(df))
+            clearsky = np.tile(clearsky, 1 + len(extended) / len(clearsky))
+            extended = clearsky[:len(extended)]
+            new_df[key] = extended
+    return new_df - df
+
 
 
 def data_summary(df):
@@ -350,7 +381,10 @@ def make_small_dev(df):
 if __name__ == "__main__":
     path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
     site_ids = '/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/selected_sites.txt'
+    path_to_data = '../Data/master_dataset.pkl'
+    df = pd.read_pickle(path_to_data).fillna(0)
+    df = df.loc['2015-07-15':'2017-07-14']
     # summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
     # print summary
-    df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
-    print(keys)
+    # df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
+    detrend_data(df)
