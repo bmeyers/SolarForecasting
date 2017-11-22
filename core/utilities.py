@@ -71,8 +71,8 @@ def envelope_fit(signal, mu, eta, kind='upper', period=None):
     try:
         problem.solve(solver='MOSEK')
     except Exception as e:
-        print e
-        print 'Trying ECOS solver'
+        print(e)
+        print('Trying ECOS solver')
         problem.solve(solver='ECOS')
     if kind == 'upper':
         return envelope.value.A1
@@ -92,8 +92,8 @@ def masked_smooth_fit_periodic(signal, mask, period, mu):
     try:
         problem.solve(solver='MOSEK')
     except Exception as e:
-        print e
-        print 'Trying ECOS solver'
+        print(e)
+        print('Trying ECOS solver')
         problem.solve(solver='ECOS')
     return fit.value.A1
 
