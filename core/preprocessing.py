@@ -40,7 +40,7 @@ class StatisticalClearSky(object):
         else:
             return self.data[:, day], self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day])
 
-    def make_clearsky_model(self, n=5, mu1=3.5, eta=0.25, mu2=3, plot=False, return_fits=False):
+    def make_clearsky_model(self, n=5, mu1=3.5, eta=1.5, mu2=3, plot=False, return_fits=False):
         if self.U is None:
             self.get_eigenvectors()
         daily_scale_factors = ((np.diag(self.D).dot(self.P[:288])))
