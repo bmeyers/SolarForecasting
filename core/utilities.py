@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cvxpy as cvx
+import datetime as dt
 
 def plot_forecasts(test, forecasts, ax=None):
     '''
@@ -58,7 +59,7 @@ def envelope_fit(signal, mu, eta, kind='upper', period=None):
     envelope = cvx.Variable(len(signal))
     mu = cvx.Parameter(sign='positive', value=mu)
     eta = cvx.Parameter(sign='positive', value=eta)
-    cost = (cvx.norm2(envelope - signal) +
+    cost = (cvx.sum_entries(cvx.huber(envelope - signal)) +
             mu * cvx.norm2(envelope[2:] - 2 * envelope[1:-1] + envelope[:-2]) +
             eta * cvx.norm1(cvx.max_elemwise(signal - envelope, 0)))
     objective = cvx.Minimize(cost)
@@ -78,3 +79,35 @@ def envelope_fit(signal, mu, eta, kind='upper', period=None):
     elif kind == 'lower':
         signal *= -1
         return -envelope.value.A1
+
+def masked_smooth_fit_periodic(signal, mask, period, mu):
+    n_samples = len(signal)
+    fit = cvx.Variable(n_samples)
+    mu = cvx.Parameter(sign='positive', value=mu)
+    cost = (cvx.sum_entries(cvx.huber(fit[mask] - signal[mask]))
+            + mu * cvx.norm2(fit[2:] - 2 * fit[1:-1] + fit[:-2]))
+    objective = cvx.Minimize(cost)
+    constraints = [fit[:len(signal) - period] == fit[period:]]
+    problem = cvx.Problem(objective, constraints)
+    try:
+        problem.solve(solver='MOSEK')
+    except Exception as e:
+        print e
+        print 'Trying ECOS solver'
+        problem.solve(solver='ECOS')
+    return fit.value.A1
+
+def day_slice_from_date_range(index, start, end=None):
+    if isinstance(start, str):
+        vals = start.split('-')
+        start = dt.date(int(vals[0]), int(vals[1]), int(vals[2]))
+    sorted_dates = np.sort(np.array(list(set(index.date))))
+    start_idx = np.where(sorted_dates == start)
+    if end is not None:
+        if isinstance(end, str):
+            vals = end.split('-')
+            end = dt.date(int(vals[0]), int(vals[1]), int(vals[2]))
+        end_idx = np.where(sorted_dates == end)
+        return np.s_[start_idx:end_idx]
+    else:
+        return np.s_[start_idx]

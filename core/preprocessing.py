@@ -3,7 +3,7 @@
 This module contains classes and functions for pre-processing data and initial data selection.
 """
 
-from core.utilities import envelope_fit
+from core.utilities import envelope_fit, masked_smooth_fit_periodic
 import numpy as np
 from numpy.linalg import svd
 import cvxpy as cvx
@@ -40,7 +40,7 @@ class StatisticalClearSky(object):
         else:
             return self.data[:, day], self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day])
 
-    def make_clearsky_model(self, n=5, mu=10**(2.), eta=10**(-1.), plot=False):
+    def make_clearsky_model(self, n=5, mu1=3.5, eta=0.25, mu2=3, plot=False, return_fits=False):
         if self.U is None:
             self.get_eigenvectors()
         daily_scale_factors = ((np.diag(self.D).dot(self.P[:288])))
@@ -49,20 +49,26 @@ class StatisticalClearSky(object):
         for ind in xrange(n):
             signal = daily_scale_factors[ind, :]
             if ind == 0:
-                envelope = envelope_fit(signal, mu=mu, eta=eta, kind='lower', period=365)
-            elif ind == 1:
-                envelope = envelope_fit(signal, mu=mu, eta=10**(-10), kind='upper', period=365)
+                fit = envelope_fit(signal, mu=10**mu1, eta=10**eta, kind='lower', period=365)
+                mask = np.abs(signal - fit) < 1.5
             else:
-                envelope = envelope_fit(signal, mu=mu, eta=10**(-10), kind='upper', period=365)
+                mu_i = mu2
+                fit = masked_smooth_fit_periodic(signal, mask, 365, mu=10**mu_i)
             signals.append(signal)
-            fits[ind, :] = envelope
+            fits[ind, :] = fit
         self.DP_clearsky = fits[:, :365]
         if plot:
-            fig, axes = plt.subplots(nrows=n, figsize=(12,14))
-            for ind in xrange(n):
-                axes[ind].plot(signals[ind], linewidth=1)
-                axes[ind].plot(fits[ind], linewidth=1)
-            return fig, axes
+            fig, axes = plt.subplots(nrows=n, figsize=(12,n*4))
+            try:
+                for ind in xrange(n):
+                    axes[ind].plot(signals[ind], linewidth=1)
+                    axes[ind].plot(fits[ind], linewidth=1)
+                return fig, axes
+            except TypeError:
+                axes.plot(signals[0], linewidth=1)
+                axes.plot(fits[0], linewidth=1)
+        if return_fits:
+            return signals, fits
 
     def estimate_clearsky(self, day_slice):
         '''
