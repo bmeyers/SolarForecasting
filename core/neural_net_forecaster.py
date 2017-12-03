@@ -18,14 +18,14 @@ class NeuralNetForecaster(Forecaster):
 
     # Additional constructor arguments:
 
-    * arch      - neural network architecture (default to "normal")
+    * arch      - neural network architecture (default to "dense")
     * nepochs   - number of training epochs (default to 100)
     * trainsize - size of training set for each epoch (default to len(train))
     * batchsize - number of training examples in gradient approximation (default to 32)
     '''
     def __init__(self, train, test, window=12*5, future=12*3,
                  train_selection="all", test_selection="hourly",
-                 arch="normal", nepochs=100, trainsize=None, batchsize=32):
+                 arch="dense", nepochs=100, trainsize=None, batchsize=32):
         assert len(train) >= window + future, "window + future size must be smaller than training set"
         assert len(test) >= window, "window size must be smaller than test set"
 
@@ -97,15 +97,17 @@ class NeuralNetForecaster(Forecaster):
             yield X, Y
 
     def make_forecasts(self):
-        if self.arch == "normal": # FULLY CONNECTED
+        if self.arch == "dense": # FULLY CONNECTED
             model = Sequential([
-                Dense(100, activation='relu', input_shape=(self.inputdim(),)),
-                Dense(80, activation='relu', kernel_regularizer=l2(.1)),
+                Dense(50, activation='relu', input_shape=(self.inputdim(),)),
+                Dense(50, activation='relu', kernel_regularizer=l2(.1)),
+                Dense(50, activation='relu', kernel_regularizer=l2(.1)),
                 Dense(self.outputdim(), activation='linear')
             ])
         elif self.arch == "conv": # CONVOLUTIONAL
             model = Sequential([
                 Conv1D(25, kernel_size=30, input_shape=(self.inputdim(),1)),
+                MaxPool1D(),
                 Conv1D(10, kernel_size=15),
                 Flatten(),
                 Dense(self.outputdim(), activation='linear')
