@@ -25,7 +25,7 @@ class NeuralNetForecaster(Forecaster):
     '''
     def __init__(self, train, test, window=12*5, future=12*3,
                  train_selection="all", test_selection="hourly",
-                 arch="dense", nepochs=100, trainsize=None, batchsize=32):
+                 arch="dense", nepochs=50, trainsize=None, batchsize=32):
         assert len(train) >= window + future, "window + future size must be smaller than training set"
         assert len(test) >= window, "window size must be smaller than test set"
 
@@ -39,7 +39,7 @@ class NeuralNetForecaster(Forecaster):
         self.trainsize = trainsize
         self.batchsize = batchsize
 
-        self.features = train.iloc[:,1:-1] # assume inverters are in columns 2, 3, ..., n-1
+        self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
         self.response = train.iloc[:,-1] # assume aggregate power is in column n
 
     def featurize(self, t):
@@ -50,20 +50,6 @@ class NeuralNetForecaster(Forecaster):
         y = self.response[t+self.window:t+self.window+self.future].values.tolist()
 
         return x, y
-
-    def unfeaturize(self, t, x, y):
-        '''
-        Given a time stamp `t`, and transformed features `x` and responses `y`, undo
-        the featurization, that is, convert `x` back into a "matrix format" with columns
-        for each inverter. `y` is not touched.
-        '''
-        m, n = self.features.shape
-        nsteps = len(x) // n
-
-        series = np.array(x).reshape((nsteps,n))
-        aggregate = np.array(y)
-
-        return series, aggregate
 
     def inputdim(self):
         nstamps, ninverters = self.features.shape
@@ -94,21 +80,22 @@ class NeuralNetForecaster(Forecaster):
                 X.append(x)
                 Y.append(y)
 
-            yield X, Y
+            yield np.array(X, dtype=np.float32), np.array(Y, dtype=np.float32)
 
     def make_forecasts(self):
         if self.arch == "dense": # FULLY CONNECTED
             model = Sequential([
-                Dense(50, activation='relu', input_shape=(self.inputdim(),)),
-                Dense(50, activation='relu', kernel_regularizer=l2(.1)),
-                Dense(50, activation='relu', kernel_regularizer=l2(.1)),
+                Dense(1024, activation='relu', input_shape=(self.inputdim(),)),
+                Dense(512, activation='relu'),
+                Dense(50, activation='relu'),
                 Dense(self.outputdim(), activation='linear')
             ])
         elif self.arch == "conv": # CONVOLUTIONAL
             model = Sequential([
-                Conv1D(25, kernel_size=30, input_shape=(self.inputdim(),1)),
+                Conv1D(64, kernel_size=3, input_shape=(self.inputdim(),1)),
                 MaxPool1D(),
-                Conv1D(10, kernel_size=15),
+                Conv1D(32, kernel_size=3),
+                MaxPool1D(),
                 Flatten(),
                 Dense(self.outputdim(), activation='linear')
             ])
