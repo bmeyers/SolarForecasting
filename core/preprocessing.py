@@ -448,18 +448,18 @@ class DataManager(object):
             self.reindexed = True
             if self.original_train is not None:
                 start = self.original_train.index[0]
-                ts = pd.date_range(start.date(), periods=len(self.original_train), freq='5min')
-                self.original_train.index = ts
+                ts_train = pd.date_range(start.date(), periods=len(self.original_train), freq='5min')
+                self.original_train.index = ts_train
                 start = self.original_dev.index[0]
-                ts = pd.date_range(start.date(), periods=len(self.original_dev), freq='5min')
-                self.original_dev.index = ts
+                ts_dev = pd.date_range(start.date(), periods=len(self.original_dev), freq='5min')
+                self.original_dev.index = ts_dev
             elif self.detrended_train is not None:
                 start = self.detrended_train.index[0]
-                ts = pd.date_range(start.date(), periods=len(self.detrended_train), freq='5min')
-                self.detrended_train.index = ts
+                ts_train = pd.date_range(start.date(), periods=len(self.detrended_train), freq='5min')
+                self.detrended_train.index = ts_train
                 start = self.detrended_dev.index[0]
-                ts = pd.date_range(start.date(), periods=len(self.detrended_dev), freq='5min')
-                self.detrended_dev.index = ts
+                ts_dev = pd.date_range(start.date(), periods=len(self.detrended_dev), freq='5min')
+                self.detrended_dev.index = ts_dev
             if include_forecasts:
                 pass
         elif self.reindexed == True and self.split_type == 'small':
