@@ -446,17 +446,17 @@ class DataManager(object):
     def swap_index(self, include_forecasts=True):
         if self.reindexed == False and self.split_type == 'small':
             self.reindexed = True
-            if self.original_test is not None:
-                start = self.original_test.index[0]
-                ts = pd.date_range(start.date(), periods=len(self.original_test), freq='5min')
-                self.original_test.index = ts
+            if self.original_train is not None:
+                start = self.original_train.index[0]
+                ts = pd.date_range(start.date(), periods=len(self.original_train), freq='5min')
+                self.original_train.index = ts
                 start = self.original_dev.index[0]
                 ts = pd.date_range(start.date(), periods=len(self.original_dev), freq='5min')
                 self.original_dev.index = ts
-            elif self.detrended_test is not None:
-                start = self.detrended_test.index[0]
-                ts = pd.date_range(start.date(), periods=len(self.detrended_test), freq='5min')
-                self.detrended_test.index = ts
+            elif self.detrended_train is not None:
+                start = self.detrended_train.index[0]
+                ts = pd.date_range(start.date(), periods=len(self.detrended_train), freq='5min')
+                self.detrended_train.index = ts
                 start = self.detrended_dev.index[0]
                 ts = pd.date_range(start.date(), periods=len(self.detrended_dev), freq='5min')
                 self.detrended_dev.index = ts
@@ -467,28 +467,18 @@ class DataManager(object):
             s = pd.date_range('2016-4-11', '2016-4-21', freq='5min')[:-1]
             c = pd.date_range('2016-1-13', '2016-1-23', freq='5min')[:-1]
             m = pd.date_range('2015-10-9', '2015-10-19', freq='5min')[:-1]
-            ts = s.append(c.append(m))
-            if self.original_dev is not None and inplace:
-                self.original_dev.index = ts
-            elif self.detrended_dev is not None and inplace:
-                self.detrended_dev.index = ts
+            ts_train = s.append(c.append(m))
+            c = pd.date_range('2017-02-25', '2017-2-29', freq='5min')[:-1]
+            s = pd.date_range('2017-03-6', '2017-3-10', freq='5min')[:-1]
+            ts_dev = c.append(s)
+            if self.original_train is not None:
+                self.original_train.index = ts_train
+                self.original_dev.index = ts_dev
+            elif self.detrended_train is not None:
+                self.detrended_train.index = ts_train
+                self.detrended_dev.index = ts_dev
             if include_forecasts:
                 pass
-            if not inplace:
-                if self.original_dev is not None and self.detrended_dev is not None:
-                    od = copy(self.original_dev)
-                    od.index = ts
-                    dd = copy(self.detrended_dev)
-                    dd.index = ts
-                    return od, dd
-                elif self.original_dev is not None:
-                    od = copy(self.original_dev)
-                    od.index = ts
-                    return od
-                elif self.detrended_dev is not None:
-                    dd = copy(self.detrended_dev)
-                    dd.index = ts
-                    return dd
 
 
 def make_index_sequential(df):
