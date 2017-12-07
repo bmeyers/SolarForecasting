@@ -16,6 +16,11 @@ DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
 DROP_LIST = [1, 2, 36, 37, 39, 41, 43, 65]
 
+try:
+    CLEARSKY_DF = pd.read_pickle('data/clearsky_master_dataset.pkl')
+except IOError:
+    pass
+
 class StatisticalClearSky(object):
     def __init__(self, data):
         self.data = data
@@ -123,6 +128,14 @@ def detrend_data(df, drop_bad_columns=True, return_clearsky=False):
     else:
         return detrended_data
 
+def retrend_data(series, key='total_power', clearsky=None):
+    if clearsky is None:
+        try:
+            clearsky = CLEARSKY_DF
+        except NameError:
+            print('Please provide a clearsky reference')
+            return
+    return clearsky[key].loc[series.index] - series
 
 
 def data_summary(df):
