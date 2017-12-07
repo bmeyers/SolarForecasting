@@ -6,21 +6,31 @@ This module contains classes and functions for pre-processing data and initial d
 from core.utilities import envelope_fit, masked_smooth_fit_periodic
 import numpy as np
 from numpy.linalg import svd
-import cvxpy as cvx
 import pandas as pd
 from glob import glob
 import matplotlib.pyplot as plt
+from copy import copy
 
 TRAIN = ('2015-7-15', '2016-11-25') # 500 days
 DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
 DROP_LIST = [1, 2, 36, 37, 39, 41, 43, 65]
 
+DEBUG = False       # Leave off unless debugging in an IDE
+
 ORIGINAL_DATA = 'data/master_dataset.pkl'
 DETRENDED_DATA = 'data/detrended_master_dataset.pkl'
+CLEARSKY_DATA = 'data/clearsky_master_dataset.pkl'
+if DEBUG:
+    ORIGINAL_DATA = '../' + ORIGINAL_DATA
+    DETRENDED_DATA = '../' + DETRENDED_DATA
+    CLEARSKY_DATA = '../' + CLEARSKY_DATA
+
+import sys
+sys.path.append('../')
 
 try:
-    CLEARSKY_DF = pd.read_pickle('data/clearsky_master_dataset.pkl')
+    CLEARSKY_DF = pd.read_pickle(CLEARSKY_DATA)
 except IOError:
     pass
 
@@ -390,6 +400,7 @@ class DataManager(object):
         self.detrended_dev = None
         self.split_type = None
         self.reindexed = None
+        self.forecasts = None
 
     def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False):
         self.load_original_data(fp=fp1)
@@ -397,12 +408,12 @@ class DataManager(object):
         self.train_dev_split(kind=kind, reindex=reindex)
 
     def load_original_data(self, fp=ORIGINAL_DATA):
-        df = pd.read_pickle('data/master_dataset.pkl').fillna(0)
+        df = pd.read_pickle(fp).fillna(0)
         df = df.loc['2015-07-15':'2017-07-14']
         self.original_full = df
 
     def load_detrended_data(self, fp=DETRENDED_DATA):
-        df = pd.read_pickle('data/detrended_master_dataset.pkl').fillna(0)
+        df = pd.read_pickle(fp).fillna(0)
         self.detrended_full = df
 
     def train_dev_split(self, kind='small', reindex=False):
@@ -411,12 +422,12 @@ class DataManager(object):
         if kind == 'small':
             if self.original_full is not None:
                 train_df = make_small_train(self.original_full, kind='combined', reindex=reindex)
-                dev_dv = make_small_dev(self.original_full)
+                dev_dv = make_small_dev(self.original_full, reindex=reindex)
                 self.original_train = train_df
                 self.original_dev = dev_dv
             if self.detrended_full is not None:
                 train_df = make_small_train(self.detrended_full, kind='combined', reindex=reindex)
-                dev_dv = make_small_dev(self.detrended_full)
+                dev_dv = make_small_dev(self.detrended_full, reindex=reindex)
                 self.detrended_train = train_df
                 self.detrended_dev = dev_dv
         elif kind == 'all':
@@ -428,6 +439,81 @@ class DataManager(object):
                 train_df, dev_df = train_dev_test_split(self.detrended_full, train=TRAIN, dev=DEV, test=None)
                 self.detrended_train = train_df
                 self.detrended_dev = dev_dv
+
+    def add_forecasts(self, forecasts):
+        self.forecasts = forecasts
+
+    def swap_index(self, include_forecasts=True):
+        if self.reindexed == False and self.split_type == 'small':
+            self.reindexed = True
+            if self.original_train is not None:
+                start = self.original_train.index[0]
+                ts_train = pd.date_range(start.date(), periods=len(self.original_train), freq='5min')
+                self.original_train.index = ts_train
+                start = self.original_dev.index[0]
+                ts_dev = pd.date_range(start.date(), periods=len(self.original_dev), freq='5min')
+                ts_dev_old = self.original_dev.index
+                self.original_dev.index = ts_dev
+            if self.detrended_train is not None:
+                start = self.detrended_train.index[0]
+                ts_train = pd.date_range(start.date(), periods=len(self.detrended_train), freq='5min')
+                self.detrended_train.index = ts_train
+                start = self.detrended_dev.index[0]
+                ts_dev = pd.date_range(start.date(), periods=len(self.detrended_dev), freq='5min')
+                ts_dev_old = self.detrended_dev.index
+                self.detrended_dev.index = ts_dev
+            if include_forecasts:
+                columns = ['f{:02}'.format(n) for n in xrange(len(self.forecasts))]
+                cols = np.r_[['new_index'], columns]
+                temp = pd.DataFrame(index=ts_dev_old, columns=cols)
+                temp['new_index'] = ts_dev
+                for n, f in enumerate(self.forecasts):
+                    key = 'f{:02}'.format(n)
+                    try:
+                        temp.loc[f.index, [key]] = f
+                    except KeyError:
+                        # Only occurs for nighttime forecasts at the very end of dev period, which are all zero and
+                        # we don't actually care about
+                        del temp[key]
+                        columns.remove(key)
+                temp.set_index('new_index', inplace=True)
+                new_forecasts = [temp[col].dropna() for col in columns]
+                self.forecasts = new_forecasts
+        elif self.reindexed == True and self.split_type == 'small':
+            self.reindexed = False
+            s = pd.date_range('2016-4-11', '2016-4-21', freq='5min')[:-1]
+            c = pd.date_range('2016-1-13', '2016-1-23', freq='5min')[:-1]
+            m = pd.date_range('2015-10-9', '2015-10-19', freq='5min')[:-1]
+            ts_train = s.append(c.append(m))
+            c = pd.date_range('2017-02-25', '2017-3-1', freq='5min')[:-1]
+            s = pd.date_range('2017-03-6', '2017-3-10', freq='5min')[:-1]
+            ts_dev = s.append(c)
+            if self.original_train is not None:
+                ts_dev_old = self.original_dev.index
+                self.original_train.index = ts_train
+                self.original_dev.index = ts_dev
+            if self.detrended_train is not None:
+                ts_dev_old = self.detrended_dev.index
+                self.detrended_train.index = ts_train
+                self.detrended_dev.index = ts_dev
+            if include_forecasts:
+                columns = ['f{:02}'.format(n) for n in xrange(len(self.forecasts))]
+                cols = np.r_[['new_index'], columns]
+                temp = pd.DataFrame(index=ts_dev_old, columns=cols)
+                temp['new_index'] = ts_dev
+                for n, f in enumerate(self.forecasts):
+                    key = 'f{:02}'.format(n)
+                    try:
+                        temp.loc[f.index, [key]] = f
+                    except KeyError:
+                        # Only occurs for nighttime forecasts at the very end of dev period, which are all zero and
+                        # we don't actually care about
+                        del temp[key]
+                        columns.remove(key)
+                temp.set_index('new_index', inplace=True)
+                new_forecasts = [temp[col].dropna() for col in columns]
+                self.forecasts = new_forecasts
+
 
 def make_index_sequential(df):
     start = df.index[0]
@@ -468,12 +554,25 @@ def make_small_dev(df, reindex=True):
 
 
 if __name__ == "__main__":
-    path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
-    site_ids = '/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/selected_sites.txt'
-    path_to_data = '../Data/master_dataset.pkl'
-    df = pd.read_pickle(path_to_data).fillna(0)
-    df = df.loc['2015-07-15':'2017-07-14']
+    #path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
+    #site_ids = '/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/selected_sites.txt'
+    #path_to_data = '../Data/master_dataset.pkl'
+    #df = pd.read_pickle(path_to_data).fillna(0)
+    #df = df.loc['2015-07-15':'2017-07-14']
     # summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
     # print summary
     # df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
-    detrend_data(df)
+    #detrend_data(df)
+    from core.arima_models import SumToSumARIMA
+    dm = DataManager()
+    dm.load_all_and_split(reindex=True)
+    prob = SumToSumARIMA(df=dm.detrended_train)
+    prob.train(order=(1, 1, 0))
+    prob.test(dm.detrended_dev['total_power'])
+    dm.add_forecasts(prob.forecasts)
+    dm.swap_index()
+    transformed_forecasts = [retrend_data(f) for f in dm.forecasts]
+    dm.add_forecasts(transformed_forecasts)
+    dm.swap_index()
+    from utilities import calc_test_mse
+    calc_test_mse(dm.original_dev, dm.forecasts)
