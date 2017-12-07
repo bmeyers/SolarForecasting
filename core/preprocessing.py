@@ -129,6 +129,16 @@ def detrend_data(df, drop_bad_columns=True, return_clearsky=False):
         return detrended_data
 
 def retrend_data(series, key='total_power', clearsky=None):
+    '''
+    This is a function for "retrending" forecasted data from a detreded data set. Requires clearsky data that was
+     used to detrend the data. Think of this as the inverse transform.
+    :param series: a Pandas series containing the data to retrend. Should have a time index that matches the clearsky
+    data
+    :param key: The column from the clearsky data to use for retrending
+    :param clearsky: A dataframe containing the clearsky data. If left as None and CLEARSKY_DF can be loaded, the master
+    detrended dataset will be used
+    :return: a retrended time series
+    '''
     if clearsky is None:
         try:
             clearsky = CLEARSKY_DF
