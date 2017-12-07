@@ -6,21 +6,31 @@ This module contains classes and functions for pre-processing data and initial d
 from core.utilities import envelope_fit, masked_smooth_fit_periodic
 import numpy as np
 from numpy.linalg import svd
-import cvxpy as cvx
 import pandas as pd
 from glob import glob
 import matplotlib.pyplot as plt
+from copy import copy
 
 TRAIN = ('2015-7-15', '2016-11-25') # 500 days
 DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
 DROP_LIST = [1, 2, 36, 37, 39, 41, 43, 65]
 
+DEBUG = True
+
 ORIGINAL_DATA = 'data/master_dataset.pkl'
 DETRENDED_DATA = 'data/detrended_master_dataset.pkl'
+CLEARSKY_DATA = 'data/clearsky_master_dataset.pkl'
+if DEBUG:
+    ORIGINAL_DATA = '../' + ORIGINAL_DATA
+    DETRENDED_DATA = '../' + DETRENDED_DATA
+    CLEARSKY_DATA = '../' + CLEARSKY_DATA
+
+import sys
+sys.path.append('../')
 
 try:
-    CLEARSKY_DF = pd.read_pickle('data/clearsky_master_dataset.pkl')
+    CLEARSKY_DF = pd.read_pickle(CLEARSKY_DATA)
 except IOError:
     pass
 
@@ -390,6 +400,7 @@ class DataManager(object):
         self.detrended_dev = None
         self.split_type = None
         self.reindexed = None
+        self.forecasts = None
 
     def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False):
         self.load_original_data(fp=fp1)
@@ -397,12 +408,12 @@ class DataManager(object):
         self.train_dev_split(kind=kind, reindex=reindex)
 
     def load_original_data(self, fp=ORIGINAL_DATA):
-        df = pd.read_pickle('data/master_dataset.pkl').fillna(0)
+        df = pd.read_pickle(fp).fillna(0)
         df = df.loc['2015-07-15':'2017-07-14']
         self.original_full = df
 
     def load_detrended_data(self, fp=DETRENDED_DATA):
-        df = pd.read_pickle('data/detrended_master_dataset.pkl').fillna(0)
+        df = pd.read_pickle(fp).fillna(0)
         self.detrended_full = df
 
     def train_dev_split(self, kind='small', reindex=False):
@@ -411,12 +422,12 @@ class DataManager(object):
         if kind == 'small':
             if self.original_full is not None:
                 train_df = make_small_train(self.original_full, kind='combined', reindex=reindex)
-                dev_dv = make_small_dev(self.original_full)
+                dev_dv = make_small_dev(self.original_full, reindex=reindex)
                 self.original_train = train_df
                 self.original_dev = dev_dv
             if self.detrended_full is not None:
                 train_df = make_small_train(self.detrended_full, kind='combined', reindex=reindex)
-                dev_dv = make_small_dev(self.detrended_full)
+                dev_dv = make_small_dev(self.detrended_full, reindex=reindex)
                 self.detrended_train = train_df
                 self.detrended_dev = dev_dv
         elif kind == 'all':
@@ -428,6 +439,57 @@ class DataManager(object):
                 train_df, dev_df = train_dev_test_split(self.detrended_full, train=TRAIN, dev=DEV, test=None)
                 self.detrended_train = train_df
                 self.detrended_dev = dev_dv
+
+    def add_forecasts(self, forecasts):
+        self.forecasts = forecasts
+
+    def swap_index(self, include_forecasts=True):
+        if self.reindexed == False and self.split_type == 'small':
+            self.reindexed = True
+            if self.original_test is not None:
+                start = self.original_test.index[0]
+                ts = pd.date_range(start.date(), periods=len(self.original_test), freq='5min')
+                self.original_test.index = ts
+                start = self.original_dev.index[0]
+                ts = pd.date_range(start.date(), periods=len(self.original_dev), freq='5min')
+                self.original_dev.index = ts
+            elif self.detrended_test is not None:
+                start = self.detrended_test.index[0]
+                ts = pd.date_range(start.date(), periods=len(self.detrended_test), freq='5min')
+                self.detrended_test.index = ts
+                start = self.detrended_dev.index[0]
+                ts = pd.date_range(start.date(), periods=len(self.detrended_dev), freq='5min')
+                self.detrended_dev.index = ts
+            if include_forecasts:
+                pass
+        elif self.reindexed == True and self.split_type == 'small':
+            self.reindexed = False
+            s = pd.date_range('2016-4-11', '2016-4-21', freq='5min')[:-1]
+            c = pd.date_range('2016-1-13', '2016-1-23', freq='5min')[:-1]
+            m = pd.date_range('2015-10-9', '2015-10-19', freq='5min')[:-1]
+            ts = s.append(c.append(m))
+            if self.original_dev is not None and inplace:
+                self.original_dev.index = ts
+            elif self.detrended_dev is not None and inplace:
+                self.detrended_dev.index = ts
+            if include_forecasts:
+                pass
+            if not inplace:
+                if self.original_dev is not None and self.detrended_dev is not None:
+                    od = copy(self.original_dev)
+                    od.index = ts
+                    dd = copy(self.detrended_dev)
+                    dd.index = ts
+                    return od, dd
+                elif self.original_dev is not None:
+                    od = copy(self.original_dev)
+                    od.index = ts
+                    return od
+                elif self.detrended_dev is not None:
+                    dd = copy(self.detrended_dev)
+                    dd.index = ts
+                    return dd
+
 
 def make_index_sequential(df):
     start = df.index[0]
@@ -468,12 +530,15 @@ def make_small_dev(df, reindex=True):
 
 
 if __name__ == "__main__":
-    path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
-    site_ids = '/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/selected_sites.txt'
-    path_to_data = '../Data/master_dataset.pkl'
-    df = pd.read_pickle(path_to_data).fillna(0)
-    df = df.loc['2015-07-15':'2017-07-14']
+    #path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
+    #site_ids = '/Users/bennetmeyers/Documents/CS229/Project/SolarForecasting/data/selected_sites.txt'
+    #path_to_data = '../Data/master_dataset.pkl'
+    #df = pd.read_pickle(path_to_data).fillna(0)
+    #df = df.loc['2015-07-15':'2017-07-14']
     # summary = summarize_files(path_to_files, suffix='pkl', testing=True, verbose=True)
     # print summary
     # df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
-    detrend_data(df)
+    #detrend_data(df)
+    dm = DataManager()
+    dm.load_all_and_split()
+    dm.swap_index()
