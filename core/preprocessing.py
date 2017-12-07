@@ -26,9 +26,6 @@ if DEBUG:
     DETRENDED_DATA = '../' + DETRENDED_DATA
     CLEARSKY_DATA = '../' + CLEARSKY_DATA
 
-import sys
-sys.path.append('../')
-
 try:
     CLEARSKY_DF = pd.read_pickle(CLEARSKY_DATA)
 except IOError:
