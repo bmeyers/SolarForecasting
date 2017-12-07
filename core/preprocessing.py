@@ -374,7 +374,7 @@ def train_dev_test_split(df, train=TRAIN, dev=DEV, test=TEST):
         df_test = None
     return [item for item in [df_train, df_dev, df_test] if item is not None]
 
-class data_manager(object):
+class DataManager(object):
     """
     A class for managing problem data. Use method load_all_and_split to execute all other methods at once. Leaving
     reindex set to False maintains original time stamps on the data, which for the small train and dev and not all
@@ -429,6 +429,12 @@ class data_manager(object):
                 self.detrended_train = train_df
                 self.detrended_dev = dev_dv
 
+def make_index_sequential(df):
+    start = df.index[0]
+    ts = pd.date_range(start.date(), periods=len(df), freq='5min')
+    df.index = ts
+    return df
+
 def make_small_train(df, kind='mixed', reindex=True):
     if kind == 'sunny':
         start = '2016-4-11'
@@ -449,9 +455,7 @@ def make_small_train(df, kind='mixed', reindex=True):
     else:
         output = pd.concat([s, c, m])
         if reindex is True:
-            start = output.index[0]
-            ts = pd.date_range(start.date(), periods=len(output), freq='5min')
-            output.index = ts
+            output = make_index_sequential(output)
     return output
 
 def make_small_dev(df, reindex=True):
@@ -459,9 +463,7 @@ def make_small_dev(df, reindex=True):
     sunny = df.loc['2017-03-6':'2017-3-9']
     output = pd.concat([sunny, cloudy], axis=0)
     if reindex:
-        start = output.index[0]
-        ts = pd.date_range(start.date(), periods=len(output), freq='5min')
-        output.index = ts
+        output = make_index_sequential(output)
     return output
 
 
