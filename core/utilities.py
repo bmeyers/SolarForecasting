@@ -39,7 +39,7 @@ def calc_test_mse(test, forecasts):
     for f in forecasts:
         join = pd.concat([f, test], axis=1).dropna()
         if np.max(join['total_power']) > 0:
-            r = join['total_power'] - join[0]
+            r = join['total_power'] - join[f.name]
             residuals = np.r_[residuals, r]
     return np.sum(np.power(residuals, 2)) / np.float(len(residuals))
 

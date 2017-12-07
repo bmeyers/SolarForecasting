@@ -16,7 +16,7 @@ DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
 DROP_LIST = [1, 2, 36, 37, 39, 41, 43, 65]
 
-DEBUG = True
+DEBUG = False       # Leave off unless debugging in an IDE
 
 ORIGINAL_DATA = 'data/master_dataset.pkl'
 DETRENDED_DATA = 'data/detrended_master_dataset.pkl'
@@ -452,33 +452,67 @@ class DataManager(object):
                 self.original_train.index = ts_train
                 start = self.original_dev.index[0]
                 ts_dev = pd.date_range(start.date(), periods=len(self.original_dev), freq='5min')
+                ts_dev_old = self.original_dev.index
                 self.original_dev.index = ts_dev
-            elif self.detrended_train is not None:
+            if self.detrended_train is not None:
                 start = self.detrended_train.index[0]
                 ts_train = pd.date_range(start.date(), periods=len(self.detrended_train), freq='5min')
                 self.detrended_train.index = ts_train
                 start = self.detrended_dev.index[0]
                 ts_dev = pd.date_range(start.date(), periods=len(self.detrended_dev), freq='5min')
+                ts_dev_old = self.detrended_dev.index
                 self.detrended_dev.index = ts_dev
             if include_forecasts:
-                pass
+                columns = ['f{:02}'.format(n) for n in xrange(len(self.forecasts))]
+                cols = np.r_[['new_index'], columns]
+                temp = pd.DataFrame(index=ts_dev_old, columns=cols)
+                temp['new_index'] = ts_dev
+                for n, f in enumerate(self.forecasts):
+                    key = 'f{:02}'.format(n)
+                    try:
+                        temp.loc[f.index, [key]] = f
+                    except KeyError:
+                        # Only occurs for nighttime forecasts at the very end of dev period, which are all zero and
+                        # we don't actually care about
+                        del temp[key]
+                        columns.remove(key)
+                temp.set_index('new_index', inplace=True)
+                new_forecasts = [temp[col].dropna() for col in columns]
+                self.forecasts = new_forecasts
         elif self.reindexed == True and self.split_type == 'small':
             self.reindexed = False
             s = pd.date_range('2016-4-11', '2016-4-21', freq='5min')[:-1]
             c = pd.date_range('2016-1-13', '2016-1-23', freq='5min')[:-1]
             m = pd.date_range('2015-10-9', '2015-10-19', freq='5min')[:-1]
             ts_train = s.append(c.append(m))
-            c = pd.date_range('2017-02-25', '2017-2-29', freq='5min')[:-1]
+            c = pd.date_range('2017-02-25', '2017-3-1', freq='5min')[:-1]
             s = pd.date_range('2017-03-6', '2017-3-10', freq='5min')[:-1]
-            ts_dev = c.append(s)
+            ts_dev = s.append(c)
             if self.original_train is not None:
+                ts_dev_old = self.original_dev.index
                 self.original_train.index = ts_train
                 self.original_dev.index = ts_dev
-            elif self.detrended_train is not None:
+            if self.detrended_train is not None:
+                ts_dev_old = self.detrended_dev.index
                 self.detrended_train.index = ts_train
                 self.detrended_dev.index = ts_dev
             if include_forecasts:
-                pass
+                columns = ['f{:02}'.format(n) for n in xrange(len(self.forecasts))]
+                cols = np.r_[['new_index'], columns]
+                temp = pd.DataFrame(index=ts_dev_old, columns=cols)
+                temp['new_index'] = ts_dev
+                for n, f in enumerate(self.forecasts):
+                    key = 'f{:02}'.format(n)
+                    try:
+                        temp.loc[f.index, [key]] = f
+                    except KeyError:
+                        # Only occurs for nighttime forecasts at the very end of dev period, which are all zero and
+                        # we don't actually care about
+                        del temp[key]
+                        columns.remove(key)
+                temp.set_index('new_index', inplace=True)
+                new_forecasts = [temp[col].dropna() for col in columns]
+                self.forecasts = new_forecasts
 
 
 def make_index_sequential(df):
@@ -529,6 +563,16 @@ if __name__ == "__main__":
     # print summary
     # df, keys = generate_master_dataset(site_ids, path_to_files, verbose=True)
     #detrend_data(df)
+    from core.arima_models import SumToSumARIMA
     dm = DataManager()
-    dm.load_all_and_split()
+    dm.load_all_and_split(reindex=True)
+    prob = SumToSumARIMA(df=dm.detrended_train)
+    prob.train(order=(1, 1, 0))
+    prob.test(dm.detrended_dev['total_power'])
+    dm.add_forecasts(prob.forecasts)
     dm.swap_index()
+    transformed_forecasts = [retrend_data(f) for f in dm.forecasts]
+    dm.add_forecasts(transformed_forecasts)
+    dm.swap_index()
+    from utilities import calc_test_mse
+    calc_test_mse(dm.original_dev, dm.forecasts)
