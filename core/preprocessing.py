@@ -91,7 +91,7 @@ class StatisticalClearSky(object):
         return clearsky.clip(min=0)
 
 
-def detrend_data(df, drop_bad_columns=True):
+def detrend_data(df, drop_bad_columns=True, return_clearsky=False):
     '''
     Detrend a datafrane of time-series power data using the StatisticalClearSky class
     :param df: A dataframe organized like the master dataset
@@ -117,7 +117,11 @@ def detrend_data(df, drop_bad_columns=True):
             clearsky = np.tile(clearsky, 1 + len(extended) / len(clearsky))
             extended = clearsky[:len(extended)]
             new_df[key] = extended
-    return new_df - df
+    detrended_data = new_df - df
+    if return_clearsky:
+        return detrended_data, new_df
+    else:
+        return detrended_data
 
 
 
