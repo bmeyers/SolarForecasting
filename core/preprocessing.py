@@ -16,6 +16,9 @@ DEV = ('2016-11-26', '2017-3-15')   # 110 days
 TEST = ('2017-3-16', '2017-07-14')  # 121 days
 DROP_LIST = [1, 2, 36, 37, 39, 41, 43, 65]
 
+ORIGINAL_DATA = 'data/master_dataset.pkl'
+DETRENDED_DATA = 'data/detrended_master_dataset.pkl'
+
 try:
     CLEARSKY_DF = pd.read_pickle('data/clearsky_master_dataset.pkl')
 except IOError:
@@ -371,7 +374,62 @@ def train_dev_test_split(df, train=TRAIN, dev=DEV, test=TEST):
         df_test = None
     return [item for item in [df_train, df_dev, df_test] if item is not None]
 
-def make_small_train(df, kind='mixed'):
+class data_manager(object):
+    """
+    A class for managing problem data. Use method load_all_and_split to execute all other methods at once. Leaving
+    reindex set to False maintains original time stamps on the data, which for the small train and dev and not all
+    sequential. This is the correct setting for analysis and exogenous data. Setting reindex to True is good for
+    plotting.
+    """
+    def __init__(self):
+        self.original_full = None
+        self.original_train = None
+        self.original_dev = None
+        self.detrended_full = None
+        self.detrended_train = None
+        self.detrended_dev = None
+        self.split_type = None
+        self.reindexed = None
+
+    def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False):
+        self.load_original_data(fp=fp1)
+        self.load_detrended_data(fp=fp2)
+        self.train_dev_split(kind=kind, reindex=reindex)
+
+    def load_original_data(self, fp=ORIGINAL_DATA):
+        df = pd.read_pickle('data/master_dataset.pkl').fillna(0)
+        df = df.loc['2015-07-15':'2017-07-14']
+        self.original_full = df
+
+    def load_detrended_data(self, fp=DETRENDED_DATA):
+        df = pd.read_pickle('data/detrended_master_dataset.pkl').fillna(0)
+        self.detrended_full = df
+
+    def train_dev_split(self, kind='small', reindex=False):
+        self.split_type = kind
+        self.reindexed = reindex
+        if kind == 'small':
+            if self.original_full is not None:
+                train_df = make_small_train(self.original_full, kind='combined', reindex=reindex)
+                dev_dv = make_small_dev(self.original_full)
+                self.original_train = train_df
+                self.original_dev = dev_dv
+            if self.detrended_full is not None:
+                train_df = make_small_train(self.detrended_full, kind='combined', reindex=reindex)
+                dev_dv = make_small_dev(self.detrended_full)
+                self.detrended_train = train_df
+                self.detrended_dev = dev_dv
+        elif kind == 'all':
+            if self.original_full is not None:
+                train_df, dev_df = train_dev_test_split(self.original_full, train=TRAIN, dev=DEV, test=None)
+                self.original_train = train_df
+                self.original_dev = dev_dv
+            if self.detrended_full is not None:
+                train_df, dev_df = train_dev_test_split(self.detrended_full, train=TRAIN, dev=DEV, test=None)
+                self.detrended_train = train_df
+                self.detrended_dev = dev_dv
+
+def make_small_train(df, kind='mixed', reindex=True):
     if kind == 'sunny':
         start = '2016-4-11'
         end = '2016-4-20'
@@ -390,18 +448,20 @@ def make_small_train(df, kind='mixed'):
         output = df.loc[start:end]
     else:
         output = pd.concat([s, c, m])
-        start = output.index[0]
-        ts = pd.date_range(start.date(), periods=len(output), freq='5min')
-        output.index = ts
+        if reindex is True:
+            start = output.index[0]
+            ts = pd.date_range(start.date(), periods=len(output), freq='5min')
+            output.index = ts
     return output
 
-def make_small_dev(df):
+def make_small_dev(df, reindex=True):
     cloudy = df.loc['2017-02-25':'2017-2-28']
     sunny = df.loc['2017-03-6':'2017-3-9']
     output = pd.concat([sunny, cloudy], axis=0)
-    start = output.index[0]
-    ts = pd.date_range(start.date(), periods=len(output), freq='5min')
-    output.index = ts
+    if reindex:
+        start = output.index[0]
+        ts = pd.date_range(start.date(), periods=len(output), freq='5min')
+        output.index = ts
     return output
 
 
