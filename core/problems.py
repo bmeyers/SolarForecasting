@@ -6,6 +6,11 @@ from core.utilities import plot_forecasts, calc_test_mse
 import numpy as np
 import pandas as pd
 
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
 
 
 

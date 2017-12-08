@@ -9,6 +9,13 @@ import matplotlib.pyplot as plt
 import cvxpy as cvx
 import datetime as dt
 
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
+
+
 def plot_forecasts(test, forecasts, ax=None):
     '''
     A utility function for plotting a list of forecasts over the target data
