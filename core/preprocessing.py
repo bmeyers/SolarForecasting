@@ -549,6 +549,47 @@ def make_small_dev(df, reindex=True):
         output = make_index_sequential(output)
     return output
 
+def make_batch(df, size, present, future):
+    """
+    Takes a dataframe and produces batches of given size.
+
+    Parameters:
+        size    - batch size
+        present - number of time steps from each inverter
+        future  - number of time steps to predict in the aggregate
+    """
+    features = df.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
+    response = df.iloc[:,-1] # assume aggregate power is in column n
+
+    n = df.shape[0]
+
+    X = []; Y = []
+    D = []
+    for i in range(size):
+        t = np.random.randint(n - present - future)
+        x = features[t:t+present].values.T.flatten().tolist()
+        y = response[t+present:t+present+future].values.tolist()
+        day = features.index.dayofyear[t]
+        X.append(x)
+        Y.append(y)
+        D.append(day)
+
+    # convert to Numpy
+    X = np.array(X, dtype=np.float32)
+    Y = np.array(Y, dtype=np.float32)
+    D = np.array(D, dtype=np.float32)
+    D = D[:,np.newaxis]
+    return X, Y, D
+
+def center_design_matrix(X):
+    """
+    Center the rows of the design matrix.
+    """
+    m = np.mean(X, 0)
+    s = np.std(X, 0)
+    Xcent = (X - m) / s
+    return Xcent
+
 
 if __name__ == "__main__":
     #path_to_files = '/Users/bennetmeyers/Documents/CS229/Project/data_dump/'
