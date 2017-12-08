@@ -33,14 +33,14 @@ class NeuralNetForecaster(Forecaster):
     * logdir       - directory for TensorBoard logs
     * rmlogdir     - tells whether or not to remove an existing TensorBoard directory log
     """
-    def __init__(self, dftrain, dftest, present=12*5, future=12*3,
+    def __init__(self, train, test, present=12*5, future=12*3,
                  train_selection="all", test_selection="hourly", logdir="./tmp/debug/", rmlogdir=False,
                  arch="FC", learningrate=1e-2, nepochs=1000, batchsize=100):
-        assert len(dftrain) >= present + future, "present + future size must be smaller than training set"
-        assert len(dftest) >= present, "present size must be smaller than test set"
+        assert len(train) >= present + future, "present + future size must be smaller than training set"
+        assert len(test) >= present, "present size must be smaller than test set"
 
-        self.dftrain = dftrain
-        self.dftest = dftest
+        self.train = train
+        self.test = test
         self.present = present
         self.future = future
 
@@ -49,8 +49,8 @@ class NeuralNetForecaster(Forecaster):
         self.batchsize = batchsize
         self.learningrate = learningrate
 
-        self.features = dftrain.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
-        self.response = dftrain.iloc[:,-1] # assume aggregate power is in column n
+        self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
+        self.response = train.iloc[:,-1] # assume aggregate power is in column n
 
         self.nstamps = self.features.shape[0]
         self.ninverters = self.features.shape[1]
@@ -103,7 +103,7 @@ class NeuralNetForecaster(Forecaster):
 
         return X, Y, D
 
-    def train(self, sess):
+    def train_net(self, sess):
         # Setup placeholders for input and output
         x = tf.placeholder(tf.float32, shape=[None, self.present*self.ninverters], name="x")
         y = tf.placeholder(tf.float32, shape=[None, self.future], name="y")
@@ -167,14 +167,25 @@ class NeuralNetForecaster(Forecaster):
         sess = tf.Session()
 
         # Fire up training, can take a while...
-        self.train(sess)
+        self.train_net(sess)
+
+        # Predict on test set
+        xtest = tf.placeholder(tf.float32, shape=[None, self.present*self.ninverters], name="xtest")
 
         forecasts = []
-        for t in np.arange(0, len(self.dftest) - self.present - self.future + 1, 12):
+        for t in np.arange(0, len(self.test) - self.present - self.future + 1, 12):
             x, y, DoY = self.featurize(t)
 
-            # TODO: call self.nn(x) and add time index
-            # yhat = self.nn(x)
-            # forecasts.append(pd.Series(data=yhat.flatten(), index=self.dftest.iloc[t+self.present:t+self.present+self.future].index))
+            # reshape to row vector
+            x = np.array(x, dtype=np.float32)[np.newaxis,:]
+
+            # feed into the net
+            ytest = self.nn(xtest)
+
+            # get result
+            yhat = sess.run(ytest, feed_dict={xtest: x})
+
+            # add back time information
+            forecasts.append(pd.Series(data=yhat.flatten(), index=self.test.iloc[t+self.present:t+self.present+self.future].index))
 
         self.forecasts = forecasts
