@@ -399,18 +399,27 @@ class DataManager(object):
         self.reindexed = None
         self.forecasts = None
 
-    def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False):
-        self.load_original_data(fp=fp1)
-        self.load_detrended_data(fp=fp2)
+    def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False,
+                           drop_bad_columns=True):
+        self.load_original_data(fp=fp1, drop_bad_columns=drop_bad_columns)
+        self.load_detrended_data(fp=fp2, drop_bad_columns=drop_bad_columns)
         self.train_dev_split(kind=kind, reindex=reindex)
 
-    def load_original_data(self, fp=ORIGINAL_DATA):
+    def load_original_data(self, fp=ORIGINAL_DATA, drop_bad_columns=True):
         df = pd.read_pickle(fp).fillna(0)
         df = df.loc['2015-07-15':'2017-07-14']
+        if drop_bad_columns:
+            for item in DROP_LIST:
+                key = 'S{:02}'.format(item)
+                del df[key]
         self.original_full = df
 
-    def load_detrended_data(self, fp=DETRENDED_DATA):
+    def load_detrended_data(self, fp=DETRENDED_DATA, drop_bad_columns=True):
         df = pd.read_pickle(fp).fillna(0)
+        if drop_bad_columns:
+            for item in DROP_LIST:
+                key = 'S{:02}'.format(item)
+                del df[key]
         self.detrended_full = df
 
     def train_dev_split(self, kind='small', reindex=False):
@@ -549,7 +558,7 @@ def make_small_dev(df, reindex=True):
         output = make_index_sequential(output)
     return output
 
-def make_batch(df, size, present, future):
+def make_batch(df, size, present, future, exo=False, randomize=True):
     """
     Takes a dataframe and produces batches of given size.
 
@@ -560,26 +569,31 @@ def make_batch(df, size, present, future):
     """
     features = df.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
     response = df.iloc[:,-1] # assume aggregate power is in column n
-
+    if exo:
+        DoY_lookup = features.index.dayofyear
+        ToD_lookup = features.index.time
     n = df.shape[0]
 
     X = []; Y = []
     D = []
     for i in range(size):
-        t = np.random.randint(n - present - future)
+        if randomize:
+            t = np.random.randint(n - present - future)
+        else:
+            t = i
         x = features[t:t+present].values.T.flatten().tolist()
         y = response[t+present:t+present+future].values.tolist()
-        day = features.index.dayofyear[t]
+        if exo:
+            DoY = DoY_lookup[t+present]
+            ToD = ToD_lookup[t+present].hour * 12 + ToD_lookup[t+present].minute / 5
+            x.extend([DoY, ToD])
         X.append(x)
         Y.append(y)
-        D.append(day)
 
     # convert to Numpy
     X = np.array(X, dtype=np.float32)
     Y = np.array(Y, dtype=np.float32)
-    D = np.array(D, dtype=np.float32)
-    D = D[:,np.newaxis]
-    return X, Y, D
+    return X, Y
 
 def center_design_matrix(X):
     """
