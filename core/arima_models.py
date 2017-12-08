@@ -8,6 +8,13 @@ import pandas as pd
 from numpy.linalg import norm
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
+
+
 class SumToSumARIMA(object):
     def __init__(self, df):
         self.df = df

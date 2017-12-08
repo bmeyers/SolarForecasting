@@ -9,7 +9,12 @@ from numpy.linalg import svd
 import pandas as pd
 from glob import glob
 import matplotlib.pyplot as plt
-from copy import copy
+
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
 
 TRAIN = ('2015-7-15', '2016-11-25') # 500 days
 DEV = ('2016-11-26', '2017-3-15')   # 110 days
