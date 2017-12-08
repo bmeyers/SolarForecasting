@@ -431,11 +431,11 @@ class DataManager(object):
             if self.original_full is not None:
                 train_df, dev_df = train_dev_test_split(self.original_full, train=TRAIN, dev=DEV, test=None)
                 self.original_train = train_df
-                self.original_dev = dev_dv
+                self.original_dev = dev_df
             if self.detrended_full is not None:
                 train_df, dev_df = train_dev_test_split(self.detrended_full, train=TRAIN, dev=DEV, test=None)
                 self.detrended_train = train_df
-                self.detrended_dev = dev_dv
+                self.detrended_dev = dev_df
 
     def add_forecasts(self, forecasts):
         self.forecasts = forecasts
