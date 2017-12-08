@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from keras.models import Sequential
-from keras.layers import Dense, Conv1D, LSTM, Dropout, MaxPool1D, Flatten
+from keras.layers import Dense, Conv1D, Conv2D, MaxPool1D, MaxPool2D, Flatten
 from keras.regularizers import l1, l2
 from keras.optimizers import Adamax, SGD
 
 class NeuralNetForecaster(Forecaster):
-    '''
+    """
     Many-to-one neural network regression in which past time series
     from many inverters are used to predict their aggregate power in
     the future.
@@ -22,7 +22,7 @@ class NeuralNetForecaster(Forecaster):
     * nepochs   - number of training epochs (default to 100)
     * trainsize - size of training set for each epoch (default to len(train))
     * batchsize - number of training examples in gradient approximation (default to 32)
-    '''
+    """
     def __init__(self, train, test, window=12*5, future=12*3,
                  train_selection="all", test_selection="hourly",
                  arch="dense", nepochs=50, trainsize=None, batchsize=32):
@@ -97,11 +97,6 @@ class NeuralNetForecaster(Forecaster):
                 Conv1D(32, kernel_size=3),
                 MaxPool1D(),
                 Flatten(),
-                Dense(self.outputdim(), activation='linear')
-            ])
-        elif self.arch == "lstm": # RECURRENT
-            model = Sequential([
-                LSTM(25, activation='relu', input_shape=(self.inputdim(),1)),
                 Dense(self.outputdim(), activation='linear')
             ])
         else:
