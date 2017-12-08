@@ -9,7 +9,12 @@ from numpy.linalg import svd
 import pandas as pd
 from glob import glob
 import matplotlib.pyplot as plt
-from copy import copy
+
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
 
 TRAIN = ('2015-7-15', '2016-11-25') # 500 days
 DEV = ('2016-11-26', '2017-3-15')   # 110 days
@@ -399,18 +404,27 @@ class DataManager(object):
         self.reindexed = None
         self.forecasts = None
 
-    def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False):
-        self.load_original_data(fp=fp1)
-        self.load_detrended_data(fp=fp2)
+    def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False,
+                           drop_bad_columns=True):
+        self.load_original_data(fp=fp1, drop_bad_columns=drop_bad_columns)
+        self.load_detrended_data(fp=fp2, drop_bad_columns=drop_bad_columns)
         self.train_dev_split(kind=kind, reindex=reindex)
 
-    def load_original_data(self, fp=ORIGINAL_DATA):
+    def load_original_data(self, fp=ORIGINAL_DATA, drop_bad_columns=True):
         df = pd.read_pickle(fp).fillna(0)
         df = df.loc['2015-07-15':'2017-07-14']
+        if drop_bad_columns:
+            for item in DROP_LIST:
+                key = 'S{:02}'.format(item)
+                del df[key]
         self.original_full = df
 
-    def load_detrended_data(self, fp=DETRENDED_DATA):
+    def load_detrended_data(self, fp=DETRENDED_DATA, drop_bad_columns=True):
         df = pd.read_pickle(fp).fillna(0)
+        if drop_bad_columns:
+            for item in DROP_LIST:
+                key = 'S{:02}'.format(item)
+                del df[key]
         self.detrended_full = df
 
     def train_dev_split(self, kind='small', reindex=False):

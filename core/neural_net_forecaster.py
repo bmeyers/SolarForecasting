@@ -10,6 +10,13 @@ from keras.layers import Dense, Conv1D, Conv2D, MaxPool1D, MaxPool2D, Flatten
 from keras.regularizers import l1, l2
 from keras.optimizers import Adamax, SGD
 
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
+
+
 class NeuralNetForecaster(Forecaster):
     """
     Many-to-one neural network regression in which past time series

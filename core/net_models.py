@@ -1,6 +1,12 @@
 import tensorflow as tf
 from keras.layers import Dense, Conv2D, MaxPool2D, Flatten
 
+# Python 2.x, 3.x compatibility
+try:
+    xrange
+except NameError:
+    xrange = range
+
 
 class FC(object):
     """
