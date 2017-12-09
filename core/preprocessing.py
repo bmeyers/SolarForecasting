@@ -589,8 +589,8 @@ def make_batch(df, size, present, future, exo=False, randomize=True):
         x = features[t:t+present].values.T.flatten().tolist()
         y = response[t+present:t+present+future].values.tolist()
         if exo:
-            DoY = DoY_lookup[t+present]
-            ToD = ToD_lookup[t+present].hour * 12 + ToD_lookup[t+present].minute / 5
+            DoY = (DoY_lookup[t+present] - 183.) / 105.36602868097478
+            ToD = ((ToD_lookup[t+present].hour * 12 + ToD_lookup[t+present].minute / 5) - 143.5) / 83.137937589686857
             x.extend([DoY, ToD])
         X.append(x)
         Y.append(y)
@@ -600,14 +600,27 @@ def make_batch(df, size, present, future, exo=False, randomize=True):
     Y = np.array(Y, dtype=np.float32)
     return X, Y
 
-def center_design_matrix(X):
+class CenterScale(object):
     """
     Center the rows of the design matrix.
     """
-    m = np.mean(X, 0)
-    s = np.std(X, 0)
-    Xcent = (X - m) / s
-    return Xcent
+    def __init__(self, y_data=None):
+        self.mean = None
+        self.stdev = None
+        self.y_data = y_data
+
+    def fit(self, x):
+        m = np.mean(x, axis=0)
+        s = np.std(x, axis=0)
+        if self.y_data is not None:
+            m[self.y_data] = 0
+            s[self.y_data] = 1
+        self.mean = m
+        self.stdev = s
+
+    def apply(self, x):
+        Xcent = (x - self.mean) / self.stdev
+        return Xcent
 
 
 if __name__ == "__main__":
