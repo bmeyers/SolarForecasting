@@ -614,7 +614,7 @@ class CenterScale(object):
         self.mean = m
         self.stdev = s
 
-    def scale(self, x):
+    def apply(self, x):
         Xcent = (x - self.mean) / self.stdev
         return Xcent
 
