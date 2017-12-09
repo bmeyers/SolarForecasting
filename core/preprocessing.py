@@ -604,13 +604,17 @@ class CenterScale(object):
     """
     Center the rows of the design matrix.
     """
-    def __init__(self):
+    def __init__(self, y_data=None):
         self.mean = None
         self.stdev = None
+        self.y_data = y_data
 
     def fit(self, x):
         m = np.mean(x, axis=0)
         s = np.std(x, axis=0)
+        if self.y_data is not None:
+            m[self.y_data] = 0
+            s[self.y_data] = 1
         self.mean = m
         self.stdev = s
 
