@@ -52,8 +52,13 @@ class NeuralNetForecaster(Forecaster):
         self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
         self.response = train.iloc[:,-1] # assume aggregate power is in column n
 
-        self.nstamps = self.features.shape[0]
+        self.features_dev = test.iloc[:,0:-1]
+        self.response_dev = test.iloc[:,-1]
+
+        self.ntrain = self.features.shape[0]
         self.ninverters = self.features.shape[1]
+
+        self.ntest = self.features_dev.shape[0]
 
         if arch == "FC":
             # self.nn = FC([512,512,future])
@@ -72,17 +77,24 @@ class NeuralNetForecaster(Forecaster):
     def outputdim(self):
         return self.future
 
-    def featurize(self, t):
+    def featurize(self, t, data="train"):
         '''
         Given a time stamp `t`, return the features and responses starting at `t`.
         '''
-        x = self.features[t:t+self.present].values.T.flatten().tolist()
-        y = self.response[t+self.present:t+self.present+self.future].values.tolist()
-        DoY = self.features.index.dayofyear[t]
+        if data == "train":
+            features = self.features
+            response = self.response
+        elif data == "test":
+            features = self.features_dev
+            response = self.response_dev
+
+        x = features[t:t+self.present].values.T.flatten().tolist()
+        y = response[t+self.present:t+self.present+self.future].values.tolist()
+        DoY = features.index.dayofyear[t]
 
         return x, y, DoY
 
-    def make_batch(self, size):
+    def make_batch(self, size, start, data="train"):
         """
         Produces batches of given size.
         """
@@ -90,8 +102,8 @@ class NeuralNetForecaster(Forecaster):
         X = []; Y = []
         D = []
         for i in range(size):
-            t = np.random.randint(self.nstamps - self.present - self.future)
-            x, y, DoY = self.featurize(t)
+            t = start + i
+            x, y, DoY = self.featurize(t, data=data)
             X.append(x)
             Y.append(y)
             D.append(DoY)
@@ -149,13 +161,12 @@ class NeuralNetForecaster(Forecaster):
         writer.add_graph(sess.graph)
 
         for i in range(self.nepochs):
-            # create batch
-            X, Y, D = self.make_batch(self.batchsize)
-            Xdev, Ydev, Ddev = self.make_batch(self.batchsize)
+            start_train = i % (self.ntrain - self.present - self.future)
+            start_dev = np.random.randint(self.ntest - self.present - self.future)
 
-            # center data
-            # X = center_design_matrix(X)
-            # Xdev = center_design_matrix(Xdev)
+            # create batch
+            X, Y, D = self.make_batch(self.batchsize, start_train)
+            Xdev, Ydev, Ddev = self.make_batch(self.batchsize, start_dev)
 
             if i % 5 == 0:
                 [tloss, dloss, s] = sess.run([train_loss, dev_loss, summ],
@@ -179,8 +190,8 @@ class NeuralNetForecaster(Forecaster):
         self.train_net(sess)
 
         forecasts = []
-        for t in np.arange(0, len(self.test) - self.present - self.future + 1, 12):
-            x, y, DoY = self.featurize(t)
+        for t in np.arange(0, self.ntest - self.present - self.future + 1, 12):
+            x, y, DoY = self.featurize(t, data="test")
 
             plt.figure()
             # reshape to row vector
