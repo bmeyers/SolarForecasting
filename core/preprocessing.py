@@ -590,7 +590,7 @@ def make_batch(df, size, present, future, exo=False, randomize=True):
         y = response[t+present:t+present+future].values.tolist()
         if exo:
             DoY = (DoY_lookup[t+present] - 183.) / 105.36602868097478
-            ToD = ((ToD_lookup[t+present].hour * 12 + ToD_lookup[t+present].minute / 5) - 143.5) / ﻿83.137937589686857
+            ToD = ((ToD_lookup[t+present].hour * 12 + ToD_lookup[t+present].minute / 5) - 143.5) / 83.137937589686857
             x.extend([DoY, ToD])
         X.append(x)
         Y.append(y)
