@@ -11,12 +11,12 @@ from core.forecaster import Forecaster
 from core.net_models import FC, CNN
 from core.preprocessing import center_design_matrix
 
-# Python 2.x, 3.x compatibility
 try:
     xrange
 except NameError:
     xrange = range
 
+import matplotlib.pyplot as plt
 
 class NeuralNetForecaster(Forecaster):
     """
@@ -56,7 +56,8 @@ class NeuralNetForecaster(Forecaster):
         self.ninverters = self.features.shape[1]
 
         if arch == "FC":
-            self.nn = FC([512,512,future])
+            # self.nn = FC([512,512,future])
+            self.nn = FC([100,80,future], regularizer=l2(.1))
         elif arch == "CNN":
             self.nn = None
 
@@ -120,6 +121,14 @@ class NeuralNetForecaster(Forecaster):
         yhat    = self.nn(x)
         yhatdev = self.nn(xdev)
 
+        # save nodes in the object for later use
+        self.x = x
+        self.y = y
+        self.xdev = xdev
+        self.ydev = ydev
+        self.yhat = yhat
+        self.yhatdev = yhatdev
+
         # Define loss in training and dev set
         with tf.name_scope("loss"):
             train_loss = tf.losses.mean_squared_error(labels=y, predictions=yhat)
@@ -145,8 +154,8 @@ class NeuralNetForecaster(Forecaster):
             Xdev, Ydev, Ddev = self.make_batch(self.batchsize)
 
             # center data
-            X = center_design_matrix(X)
-            Xdev = center_design_matrix(Xdev)
+            # X = center_design_matrix(X)
+            # Xdev = center_design_matrix(Xdev)
 
             if i % 5 == 0:
                 [tloss, dloss, s] = sess.run([train_loss, dev_loss, summ],
@@ -169,21 +178,21 @@ class NeuralNetForecaster(Forecaster):
         # Fire up training, can take a while...
         self.train_net(sess)
 
-        # Predict on test set
-        xtest = tf.placeholder(tf.float32, shape=[None, self.present*self.ninverters], name="xtest")
-
         forecasts = []
         for t in np.arange(0, len(self.test) - self.present - self.future + 1, 12):
             x, y, DoY = self.featurize(t)
 
+            plt.figure()
             # reshape to row vector
             x = np.array(x, dtype=np.float32)[np.newaxis,:]
 
-            # feed into the net
-            ytest = self.nn(xtest)
-
             # get result
-            yhat = sess.run(ytest, feed_dict={xtest: x})
+            yhat = sess.run(self.yhatdev, feed_dict={self.xdev: x})
+
+            plt.plot(np.arange(len(y)), y, label="true")
+            plt.plot(np.arange(len(y)), yhat.flatten(), label="pred")
+            plt.legend()
+            plt.show()
 
             # add back time information
             forecasts.append(pd.Series(data=yhat.flatten(), index=self.test.iloc[t+self.present:t+self.present+self.future].index))
