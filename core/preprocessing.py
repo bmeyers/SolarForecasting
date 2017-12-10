@@ -463,7 +463,8 @@ class DataManager(object):
             return
         else:
             error_target = totalvar_window(self.detrended_full['total_power'], window)
-            self.error_full = pd.DataFrame(data=error_target, index=self.original_full.index, columns=['error_target'])
+            self.error_full = pd.DataFrame(data=error_target).fillna(0)
+            self.error_full.columns = ['error_target']
             if split:
                 kind = self.split_type
                 reindex = self.reindexed
