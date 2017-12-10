@@ -3,7 +3,7 @@
 This module contains classes and functions for pre-processing data and initial data selection.
 """
 
-from core.utilities import envelope_fit, masked_smooth_fit_periodic
+from core.utilities import envelope_fit, masked_smooth_fit_periodic, totalvar_window
 import numpy as np
 from numpy.linalg import svd
 import pandas as pd
@@ -406,6 +406,9 @@ class DataManager(object):
         self.split_type = None
         self.reindexed = None
         self.forecasts = None
+        self.error_full = None
+        self.error_train = None
+        self.error_dev = None
 
     def load_all_and_split(self, fp1=ORIGINAL_DATA, fp2=DETRENDED_DATA, kind='small', reindex=False,
                            drop_bad_columns=True):
@@ -453,6 +456,26 @@ class DataManager(object):
                 train_df, dev_df = train_dev_test_split(self.detrended_full, train=TRAIN, dev=DEV, test=None)
                 self.detrended_train = train_df
                 self.detrended_dev = dev_df
+
+    def make_error_target(self, split=True, window=24):
+        if self.detrended_full is None:
+            print 'Please load detrended data'
+            return
+        else:
+            error_target = totalvar_window(self.detrended_full['total_power'], window)
+            self.error_full = pd.DataFrame(data=error_target, index=self.original_full.index, columns=['error_target'])
+            if split:
+                kind = self.split_type
+                reindex = self.reindexed
+                if kind == 'small':
+                    train_df = make_small_train(self.error_full, kind='combined', reindex=reindex)
+                    dev_dv = make_small_dev(self.error_full, reindex=reindex)
+                    self.error_train = train_df
+                    self.error_dev = dev_dv
+                elif kind == 'all':
+                    train_df, dev_df = train_dev_test_split(self.error_full, train=TRAIN, dev=DEV, test=None)
+                    self.error_train = train_df
+                    self.error_dev = dev_df
 
     def add_forecasts(self, forecasts):
         self.forecasts = forecasts
@@ -566,7 +589,7 @@ def make_small_dev(df, reindex=True):
         output = make_index_sequential(output)
     return output
 
-def make_batch(df, size, present, future, exo=False, randomize=True):
+def make_batch(df, size, present, future, exo=False, randomize=True, error_target=None):
     """
     Takes a dataframe and produces batches of given size.
 
@@ -583,6 +606,8 @@ def make_batch(df, size, present, future, exo=False, randomize=True):
     n = df.shape[0]
 
     X = []; Y = []
+    X_a = X.append
+    Y_a = Y.append
     D = []
     for i in range(size):
         if randomize:
@@ -591,12 +616,15 @@ def make_batch(df, size, present, future, exo=False, randomize=True):
             t = i
         x = features[t:t+present].values.T.flatten().tolist()
         y = response[t+present:t+present+future].values.tolist()
+        if error_target is not None:
+            new_y = error_target[t+present:t+present+future].values.tolist()
+            y.extend(new_y)
         if exo:
             DoY = (DoY_lookup[t+present] - 183.) / 105.36602868097478
             ToD = ((ToD_lookup[t+present].hour * 12 + ToD_lookup[t+present].minute / 5) - 143.5) / 83.137937589686857
             x.extend([DoY, ToD])
-        X.append(x)
-        Y.append(y)
+        X_a(x)
+        Y_a(y)
 
     # convert to Numpy
     X = np.array(X, dtype=np.float32)

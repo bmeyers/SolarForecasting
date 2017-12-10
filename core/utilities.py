@@ -121,3 +121,15 @@ def day_slice_from_date_range(index, start, end=None):
         return np.s_[start_idx:end_idx]
     else:
         return np.s_[start_idx]
+
+def totalvar(arr):
+    diff = arr[:-1] - arr[1:]
+    return np.sum(np.abs(diff))
+
+def totalvar_window(signal, window):
+    if isinstance(signal, pd.core.series.Series):
+        stdev = signal.rolling(window=window, center=True).apply(totalvar)
+    else:
+        series = pd.Series(data=signal)
+        stdev = series.rolling(window=window, center=True).apply(totalvar)
+    return stdev
