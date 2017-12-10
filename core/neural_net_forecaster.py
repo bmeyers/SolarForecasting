@@ -9,7 +9,6 @@ from keras.regularizers import l1, l2
 
 from core.forecaster import Forecaster
 from core.net_models import FC, CNN
-from core.preprocessing import center_design_matrix
 
 try:
     xrange
@@ -46,7 +45,7 @@ class NeuralNetForecaster(Forecaster):
         self.learningrate = learningrate
         self.sampling = sampling
         self.exo = exo
-        
+
         # delcaring other attributes
         self.present = None
         self.future = None
