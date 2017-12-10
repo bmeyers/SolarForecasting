@@ -56,6 +56,9 @@ class NeuralNetForecaster(Forecaster):
 
 
     def set_train_data(self, train):
+        """
+        Set training data at any time as it becomes available.
+        """
         self.train = train
         self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
         self.response = train.iloc[:,-1] # assume aggregate power is in column n
@@ -66,6 +69,9 @@ class NeuralNetForecaster(Forecaster):
 
 
     def set_test_data(self, test):
+        """
+        Set test data at any time for making predictions.
+        """
         self.test = test
         self.features_dev = test.iloc[:,0:-1]
         self.response_dev = test.iloc[:,-1]
@@ -75,15 +81,69 @@ class NeuralNetForecaster(Forecaster):
 
 
     def init_tensorflow(self, arch, logdir):
+        """
+        Initialize TensorFlow computational graph and TensorBoard logging.
+        """
+        # start clean
+        tf.reset_default_graph()
+        sess = tf.Session()
+
+        # choose among different architectures
         if arch == "FC1":
             self.nn = FC([2000,1000,self.future], regularizer=l2(0.0001))
         else:
             raise ValueError("Invalid architecture")
 
-        self.logdir = logdir
+        # setup placeholders for input and output
+        x = tf.placeholder(tf.float32, shape=[None, self.inputdim()], name="x")
+        y = tf.placeholder(tf.float32, shape=[None, self.outputdim()], name="y")
+
+        # similarly, setup placeholders for dev set
+        xdev = tf.placeholder(tf.float32, shape=[None, self.inputdim()], name="xdev")
+        ydev = tf.placeholder(tf.float32, shape=[None, self.outputdim()], name="ydev")
+
+        # define forward pass
+        yhat    = self.nn(x)
+        yhatdev = self.nn(xdev)
+
+        # define loss in training and dev set
+        with tf.name_scope("loss"):
+            train_loss = tf.losses.mean_squared_error(labels=y, predictions=yhat)
+            dev_loss = tf.losses.mean_squared_error(labels=ydev, predictions=yhatdev)
+            tf.summary.scalar("train_loss", train_loss)
+            tf.summary.scalar("dev_loss", dev_loss)
+
+        # minimize training loss
+        with tf.name_scope("train"):
+            train_step = tf.train.AdamOptimizer(self.learningrate).minimize(train_loss)
+
+        # collect all summaries for TensorBoard
+        summ = tf.summary.merge_all()
+
+        # initialize computational graph
+        sess.run(tf.global_variables_initializer())
+        writer = tf.summary.FileWriter(logdir)
+        writer.add_graph(sess.graph)
+
+        # save session info and graph nodes for later use
+        self.sess = sess
+        self.writer = writer
+        self.x = x
+        self.y = y
+        self.xdev = xdev
+        self.ydev = ydev
+        self.yhat = yhat
+        self.yhatdev = yhatdev
+        self.train_loss = train_loss
+        self.dev_loss = dev_loss
+        self.train_step = train_step
+        self.summ = summ
 
 
     def inputdim(self):
+        """
+        Returns problem input dimension.
+        """
         if self.exo:
             return self.present*self.ninverters + 2
         else:
@@ -91,6 +151,9 @@ class NeuralNetForecaster(Forecaster):
 
 
     def outputdim(self):
+        """
+        Returns problem output dimension.
+        """
         return self.future
 
 
@@ -143,46 +206,10 @@ class NeuralNetForecaster(Forecaster):
         return X, Y
 
 
-    def train_net(self, sess):
-        # Setup placeholders for input and output
-        x = tf.placeholder(tf.float32, shape=[None, self.inputdim()], name="x")
-        y = tf.placeholder(tf.float32, shape=[None, self.outputdim()], name="y")
-
-        # Similarly, setup placeholders for dev set
-        xdev = tf.placeholder(tf.float32, shape=[None, self.inputdim()], name="xdev")
-        ydev = tf.placeholder(tf.float32, shape=[None, self.outputdim()], name="ydev")
-
-        # Feed forward into the net
-        yhat    = self.nn(x)
-        yhatdev = self.nn(xdev)
-
-        # save nodes in the object for later use
-        self.x = x
-        self.y = y
-        self.xdev = xdev
-        self.ydev = ydev
-        self.yhat = yhat
-        self.yhatdev = yhatdev
-
-        # Define loss in training and dev set
-        with tf.name_scope("loss"):
-            train_loss = tf.losses.mean_squared_error(labels=y, predictions=yhat)
-            dev_loss = tf.losses.mean_squared_error(labels=ydev, predictions=yhatdev)
-            tf.summary.scalar("train_loss", train_loss)
-            tf.summary.scalar("dev_loss", dev_loss)
-
-        # Minimize training loss
-        with tf.name_scope("train"):
-            train_step = tf.train.AdamOptimizer(self.learningrate).minimize(train_loss)
-
-        # Collect all summaries for TensorBoard
-        summ = tf.summary.merge_all()
-
-        # Start of execution
-        sess.run(tf.global_variables_initializer())
-        writer = tf.summary.FileWriter(self.logdir)
-        writer.add_graph(sess.graph)
-
+    def learn(self):
+        """
+        Performs training with the current training data set.
+        """
         tail = self.batchsize + self.present + self.future
 
         for i in range(self.niter):
@@ -199,22 +226,19 @@ class NeuralNetForecaster(Forecaster):
             Xdev, Ydev = self.make_batch(times_dev, data="test")
 
             if i % 5 == 0:
-                [tloss, dloss, s] = sess.run([train_loss, dev_loss, summ],
-                                             feed_dict={x: X, y: Y, xdev: Xdev, ydev: Ydev})
-                writer.add_summary(s, i)
-                writer.flush()
+                [tloss, dloss, s] = self.sess.run([self.train_loss, self.dev_loss, self.summ],
+                                                  feed_dict={self.x: X, self.y: Y,
+                                                             self.xdev: Xdev, self.ydev: Ydev})
+                self.writer.add_summary(s, i)
+                self.writer.flush()
 
-            sess.run(train_step, feed_dict={x: X, y: Y, xdev: Xdev, ydev: Ydev})
+            self.sess.run(self.train_step, feed_dict={self.x: X, self.y: Y, self.xdev: Xdev, self.ydev: Ydev})
 
 
-    def make_forecasts(self):
-        # Start clean
-        tf.reset_default_graph()
-        sess = tf.Session()
-
-        # Fire up training, can take a while...
-        self.train_net(sess)
-
+    def predict(self):
+        """
+        Make predictions after having learned from experience.
+        """
         forecasts = []
         for t in np.arange(0, self.ntest - self.present - self.future + 1, 12):
             x, y = self.featurize(t, data="test")
@@ -223,9 +247,17 @@ class NeuralNetForecaster(Forecaster):
             x = np.array(x, dtype=np.float32)[np.newaxis,:]
 
             # get result
-            yhat = sess.run(self.yhatdev, feed_dict={self.xdev: x})
+            yhat = self.sess.run(self.yhatdev, feed_dict={self.xdev: x})
 
             # add back time information
             forecasts.append(pd.Series(data=yhat.flatten(), index=self.test.iloc[t+self.present:t+self.present+self.future].index))
 
         self.forecasts = forecasts
+
+
+    def make_forecasts(self):
+        # fire up training, can take a while...
+        self.learn()
+
+        # make predictions and store them in the object
+        self.predict()
