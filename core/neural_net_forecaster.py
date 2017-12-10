@@ -30,10 +30,9 @@ class NeuralNetForecaster(Forecaster):
     * learningrate - learning rate for gradient descent
     * sampling     - tells how to generate batches (rand or seq)
     * logdir       - directory for TensorBoard logs
-    * rmlogdir     - tells whether or not to remove an existing TensorBoard directory log
     """
     def __init__(self, train, test, present=12*5, future=12*3,
-                 train_selection="all", test_selection="hourly", logdir="./tmp/debug/", rmlogdir=False,
+                 train_selection="all", test_selection="hourly", logdir="./tmp/debug/trial",
                  arch="FC", learningrate=1e-2, niter=1000, batchsize=100, sampling="rand"):
         assert len(train) >= present + future, "present + future size must be smaller than training set"
         assert len(test) >= present, "present size must be smaller than test set"
@@ -64,9 +63,6 @@ class NeuralNetForecaster(Forecaster):
             self.nn = FC([2000,1000,future], regularizer=l2(0.0001))
 
         self.logdir = logdir
-
-        if rmlogdir:
-            rmtree(logdir + arch)
 
     def inputdim(self):
         return self.present*self.ninverters
@@ -154,7 +150,7 @@ class NeuralNetForecaster(Forecaster):
 
         # Start of execution
         sess.run(tf.global_variables_initializer())
-        writer = tf.summary.FileWriter(self.logdir + self.arch)
+        writer = tf.summary.FileWriter(self.logdir)
         writer.add_graph(sess.graph)
 
         tail = self.batchsize + self.present + self.future
