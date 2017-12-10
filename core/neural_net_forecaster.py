@@ -24,9 +24,9 @@ class NeuralNetForecaster(Forecaster):
 
     # Additional constructor arguments:
 
-    * arch         - neural network architecture (default to "dense")
+    * arch         - neural network architecture (default to a dense model)
     * niter        - number of training iterations (default to 1000)
-    * batchsize    - number of training examples in gradient approximation (default to 32)
+    * batchsize    - number of training examples in gradient approximation (default to 100)
     * learningrate - learning rate for gradient descent
     * sampling     - tells how to generate batches (rand or seq)
     * logdir       - directory for TensorBoard logs
@@ -37,19 +37,11 @@ class NeuralNetForecaster(Forecaster):
         assert len(train) >= present + future, "present + future size must be smaller than training set"
         assert len(test) >= present, "present size must be smaller than test set"
 
-        self.train = train
-        self.test = test
+        # initialize data attributes
+        self.set_train_data(train)
+        self.set_test_data(test)
 
-        self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
-        self.response = train.iloc[:,-1] # assume aggregate power is in column n
-        self.DoY = self.features.index.dayofyear
-        self.ToD = self.features.index.time
-
-        self.features_dev = test.iloc[:,0:-1]
-        self.response_dev = test.iloc[:,-1]
-        self.DoY_dev = self.features_dev.index.dayofyear
-        self.ToD_dev = self.features_dev.index.time
-
+        # initialize hyperparameters
         self.present = present
         self.future = future
         self.arch = arch
@@ -59,14 +51,37 @@ class NeuralNetForecaster(Forecaster):
         self.sampling = sampling
         self.exo = exo
 
+        # initialize TensorFlow
+        self.init_tensorflow(arch, logdir)
+
+
+    def set_train_data(self, train):
+        self.train = train
+        self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
+        self.response = train.iloc[:,-1] # assume aggregate power is in column n
+        self.DoY = self.features.index.dayofyear
+        self.ToD = self.features.index.time
         self.ntrain = self.features.shape[0]
-        self.ntest = self.features_dev.shape[0]
         self.ninverters = self.features.shape[1]
 
+
+    def set_test_data(self, test):
+        self.test = test
+        self.features_dev = test.iloc[:,0:-1]
+        self.response_dev = test.iloc[:,-1]
+        self.DoY_dev = self.features_dev.index.dayofyear
+        self.ToD_dev = self.features_dev.index.time
+        self.ntest = self.features_dev.shape[0]
+
+
+    def init_tensorflow(self, arch, logdir):
         if arch == "FC1":
-            self.nn = FC([2000,1000,future], regularizer=l2(0.0001))
+            self.nn = FC([2000,1000,self.future], regularizer=l2(0.0001))
+        else:
+            raise ValueError("Invalid architecture")
 
         self.logdir = logdir
+
 
     def inputdim(self):
         if self.exo:
@@ -74,8 +89,10 @@ class NeuralNetForecaster(Forecaster):
         else:
             return self.present*self.ninverters
 
+
     def outputdim(self):
         return self.future
+
 
     def featurize(self, t, data="train"):
         '''
@@ -108,6 +125,7 @@ class NeuralNetForecaster(Forecaster):
 
         return x, y
 
+
     def make_batch(self, times, data="train"):
         """
         Produces batches of examples starting at various `times`.
@@ -123,6 +141,7 @@ class NeuralNetForecaster(Forecaster):
         Y = np.array(Y, dtype=np.float32)
 
         return X, Y
+
 
     def train_net(self, sess):
         # Setup placeholders for input and output
@@ -186,6 +205,7 @@ class NeuralNetForecaster(Forecaster):
                 writer.flush()
 
             sess.run(train_step, feed_dict={x: X, y: Y, xdev: Xdev, ydev: Ydev})
+
 
     def make_forecasts(self):
         # Start clean
