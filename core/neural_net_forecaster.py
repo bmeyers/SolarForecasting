@@ -37,6 +37,42 @@ class NeuralNetForecaster(Forecaster):
         assert len(train) >= present + future, "present + future size must be smaller than training set"
         assert len(test) >= present, "present size must be smaller than test set"
 
+        # name attributes ("good coding practices" in Python)
+        self.present = None
+        self.future = None
+        self.arch = None
+        self.niter = None
+        self.batchsize = None
+        self.learningrate = None
+        self.sampling = None
+        self.exo = None
+        self.train = None
+        self.features = None
+        self.reponse = None
+        self.DoY = None
+        self.ToD = None
+        self.ntrain = None
+        self.ninverters = None
+        self.test = None
+        self.features_dev = None
+        self.response_dev = None
+        self.DoY_dev = None
+        self.ToD_dev = None
+        self.ntest = None
+        self.sess = None
+        self.writer = None
+        self.x = None
+        self.y = None
+        self.xdev = None
+        self.ydev = None
+        self.yhat = None
+        self.yhatdev = None
+        self.train_loss = None
+        self.dev_loss = None
+        self.train_step = None
+        self.summ = None
+        self.forecasts = None
+
         # initialize data attributes
         self.set_train_data(train)
         self.set_test_data(test)
