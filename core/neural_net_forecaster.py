@@ -48,14 +48,6 @@ class NeuralNetForecaster(Forecaster):
         self.exo = exo
         
         # delcaring other attributes
-        self.present = None
-        self.future = None
-        self.arch = None
-        self.niter = None
-        self.batchsize = None
-        self.learningrate = None
-        self.sampling = None
-        self.exo = None
         self.train = None
         self.features = None
         self.reponse = None
