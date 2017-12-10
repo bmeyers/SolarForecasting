@@ -170,7 +170,7 @@ class NeuralNetForecaster(Forecaster):
             if self.sampling == "rand":
                 times = np.random.randint(0, self.ntrain - tail, size=self.batchsize)
             elif self.sampling == "seq":
-                start = i % (self.ntrain - tail)
+                start = i % (self.ntrain - tail) # this cycles inside valid memory indexes
                 times = range(start, start + self.batchsize)
 
             times_dev = np.random.randint(0, self.ntest - tail, size=self.batchsize)
