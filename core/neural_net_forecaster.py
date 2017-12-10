@@ -16,8 +16,6 @@ try:
 except NameError:
     xrange = range
 
-import matplotlib.pyplot as plt
-
 class NeuralNetForecaster(Forecaster):
     """
     Many-to-one neural network regression in which past time series
@@ -196,17 +194,11 @@ class NeuralNetForecaster(Forecaster):
         for t in np.arange(0, self.ntest - self.present - self.future + 1, 12):
             x, y, DoY = self.featurize(t, data="test")
 
-            plt.figure()
             # reshape to row vector
             x = np.array(x, dtype=np.float32)[np.newaxis,:]
 
             # get result
             yhat = sess.run(self.yhatdev, feed_dict={self.xdev: x})
-
-            plt.plot(np.arange(len(y)), y, label="true")
-            plt.plot(np.arange(len(y)), yhat.flatten(), label="pred")
-            plt.legend()
-            plt.show()
 
             # add back time information
             forecasts.append(pd.Series(data=yhat.flatten(), index=self.test.iloc[t+self.present:t+self.present+self.future].index))
