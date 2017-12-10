@@ -70,7 +70,7 @@ class NeuralNetForecaster(Forecaster):
         self.logdir = logdir
 
     def inputdim(self):
-        if exo:
+        if self.exo:
             return self.present*self.ninverters + 2
         else:
             return self.present*self.ninverters
@@ -96,7 +96,7 @@ class NeuralNetForecaster(Forecaster):
         x = features[t:t+self.present].values.T.flatten().tolist()
         y = response[t+self.present:t+self.present+self.future].values.tolist()
 
-        if exo:
+        if self.exo:
             # lookup day or year and time of day
             doy = DoY[t]
             tod = ToD[t]
