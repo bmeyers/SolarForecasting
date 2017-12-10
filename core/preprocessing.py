@@ -61,22 +61,25 @@ class StatisticalClearSky(object):
         else:
             return self.data[:, day], self.U[:, :n].dot(np.diag(self.D[:n])).dot(self.P[:n, day])
 
-    def make_clearsky_model(self, n=5, mu1=3.5, eta=1.5, mu2=3, plot=False, return_fits=False):
+    def make_clearsky_model(self, n=5, mu1=3.5, eta=1.5, mu2=3, plot=False, return_fits=False, env_fit=0):
         if self.U is None:
             self.get_eigenvectors()
         daily_scale_factors = ((np.diag(self.D).dot(self.P[:288])))
-        signals = []
+        signals = [None] * n
         fits = np.empty((n, self.P.shape[1]))
+        ind = env_fit
+        signal = daily_scale_factors[ind, :]
+        fit = envelope_fit(signal, mu=10 ** mu1, eta=10 ** eta, kind='lower', period=365)
+        mask = np.abs(signal - fit) < 1.5
+        signals[ind] = signal
+        fits[ind, :] = fit
         for ind in xrange(n):
-            signal = daily_scale_factors[ind, :]
-            if ind == 0:
-                fit = envelope_fit(signal, mu=10**mu1, eta=10**eta, kind='lower', period=365)
-                mask = np.abs(signal - fit) < 1.5
-            else:
+            if ind != env_fit:
+                signal = daily_scale_factors[ind, :]
                 mu_i = mu2
                 fit = masked_smooth_fit_periodic(signal, mask, 365, mu=10**mu_i)
-            signals.append(signal)
-            fits[ind, :] = fit
+                signals[ind] = signal
+                fits[ind, :] = fit
         self.DP_clearsky = fits[:, :365]
         if plot:
             fig, axes = plt.subplots(nrows=n, figsize=(12,n*4), sharex=True)
