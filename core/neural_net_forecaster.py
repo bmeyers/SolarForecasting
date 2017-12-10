@@ -204,8 +204,8 @@ class NeuralNetForecaster(Forecaster):
 
         if self.exo:
             # lookup day or year and time of day
-            doy = DoY[t]
-            tod = ToD[t]
+            doy = DoY[t+self.present]
+            tod = ToD[t+self.present]
 
             # normalization
             doy = (doy - 183.) / 105.36602868097478
