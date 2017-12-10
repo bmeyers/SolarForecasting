@@ -37,7 +37,17 @@ class NeuralNetForecaster(Forecaster):
         assert len(train) >= present + future, "present + future size must be smaller than training set"
         assert len(test) >= present, "present size must be smaller than test set"
 
-        # name attributes ("good coding practices" in Python)
+        # initialize hyperparameters
+        self.present = present
+        self.future = future
+        self.arch = arch
+        self.niter = niter
+        self.batchsize = batchsize
+        self.learningrate = learningrate
+        self.sampling = sampling
+        self.exo = exo
+        
+        # delcaring other attributes
         self.present = None
         self.future = None
         self.arch = None
@@ -76,16 +86,6 @@ class NeuralNetForecaster(Forecaster):
         # initialize data attributes
         self.set_train_data(train)
         self.set_test_data(test)
-
-        # initialize hyperparameters
-        self.present = present
-        self.future = future
-        self.arch = arch
-        self.niter = niter
-        self.batchsize = batchsize
-        self.learningrate = learningrate
-        self.sampling = sampling
-        self.exo = exo
 
         # initialize TensorFlow
         self.init_tensorflow(arch, logdir)
