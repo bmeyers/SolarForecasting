@@ -33,7 +33,7 @@ class NeuralNetForecaster(Forecaster):
     """
     def __init__(self, train, test, present=12*5, future=12*3,
                  train_selection="all", test_selection="hourly", logdir="./tmp/debug/trial",
-                 arch="FC", learningrate=1e-2, niter=1000, batchsize=100, sampling="rand"):
+                 arch="FC", learningrate=1e-2, niter=1000, batchsize=100, sampling="rand", exo=False):
         assert len(train) >= present + future, "present + future size must be smaller than training set"
         assert len(test) >= present, "present size must be smaller than test set"
 
@@ -47,12 +47,17 @@ class NeuralNetForecaster(Forecaster):
         self.batchsize = batchsize
         self.learningrate = learningrate
         self.sampling = sampling
+        self.exo = exo
 
         self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
         self.response = train.iloc[:,-1] # assume aggregate power is in column n
+        self.DoY = self.features.index.dayofyear
+        self.ToD = self.features.index.time
 
         self.features_dev = test.iloc[:,0:-1]
         self.response_dev = test.iloc[:,-1]
+        self.DoY_dev = self.features_dev.index.dayofyear
+        self.ToD_dev = self.features_dev.index.time
 
         self.ntrain = self.features.shape[0]
         self.ninverters = self.features.shape[1]
@@ -65,7 +70,10 @@ class NeuralNetForecaster(Forecaster):
         self.logdir = logdir
 
     def inputdim(self):
-        return self.present*self.ninverters
+        if exo:
+            return self.present*self.ninverters + 2
+        else:
+            return self.present*self.ninverters
 
     def outputdim(self):
         return self.future
@@ -77,50 +85,55 @@ class NeuralNetForecaster(Forecaster):
         if data == "train":
             features = self.features
             response = self.response
+            DoY = self.DoY
+            ToD = self.ToD
         elif data == "test":
             features = self.features_dev
             response = self.response_dev
+            DoY = self.DoY_dev
+            ToD = self.ToD_dev
 
         x = features[t:t+self.present].values.T.flatten().tolist()
         y = response[t+self.present:t+self.present+self.future].values.tolist()
-        DoY = features.index.dayofyear[t]
 
-        return x, y, DoY
+        if exo:
+            # lookup day or year and time of day
+            doy = DoY[t]
+            tod = ToD[t]
 
-    def make_batch(self, size, start, data="train"):
+            # normalization
+            doy = (doy - 183.) / 105.36602868097478
+            tod = ((tod.hour * 12 + tod.minute / 5) - 143.5) / 83.137937589686857
+
+            x.append(doy)
+            x.append(tod)
+
+        return x, y
+
+    def make_batch(self, times, data="train"):
         """
-        Produces batches of given `size` starting from time `start`.
+        Produces batches of examples starting at various `times`.
         """
-
         X = []; Y = []
-        D = []
-        for i in range(size):
-            t = start + i
-            x, y, DoY = self.featurize(t, data=data)
+        for t in times:
+            x, y = self.featurize(t, data=data)
             X.append(x)
             Y.append(y)
-            D.append(DoY)
 
         # convert to Numpy
         X = np.array(X, dtype=np.float32)
         Y = np.array(Y, dtype=np.float32)
-        D = np.array(D, dtype=np.float32)
-        D = D[:,np.newaxis]
 
-        return X, Y, D
+        return X, Y
 
     def train_net(self, sess):
         # Setup placeholders for input and output
-        x = tf.placeholder(tf.float32, shape=[None, self.present*self.ninverters], name="x")
-        y = tf.placeholder(tf.float32, shape=[None, self.future], name="y")
+        x = tf.placeholder(tf.float32, shape=[None, self.inputdim()], name="x")
+        y = tf.placeholder(tf.float32, shape=[None, self.outputdim()], name="y")
 
         # Similarly, setup placeholders for dev set
-        xdev = tf.placeholder(tf.float32, shape=[None, self.present*self.ninverters], name="xdev")
-        ydev = tf.placeholder(tf.float32, shape=[None, self.future], name="ydev")
-
-        # Setup placeholders for day of year
-        day = tf.placeholder(tf.float32, shape=[None, 1], name="day")
-        daydev = tf.placeholder(tf.float32, shape=[None, 1], name="daydev")
+        xdev = tf.placeholder(tf.float32, shape=[None, self.inputdim()], name="xdev")
+        ydev = tf.placeholder(tf.float32, shape=[None, self.outputdim()], name="ydev")
 
         # Feed forward into the net
         yhat    = self.nn(x)
@@ -158,25 +171,24 @@ class NeuralNetForecaster(Forecaster):
         for i in range(self.niter):
             # define start of batch
             if self.sampling == "rand":
-                start_train = np.random.randint(self.ntrain - tail)
+                times = np.random.randint(0, self.ntrain - tail, size=self.batchsize)
             elif self.sampling == "seq":
-                start_train = i % (self.ntrain - tail)
+                start = i % (self.ntrain - tail)
+                times = range(start, start + self.batchsize)
 
-            start_dev = np.random.randint(self.ntest - tail)
+            times_dev = np.random.randint(0, self.ntest - tail, size=self.batchsize)
 
             # create batch
-            X, Y, D = self.make_batch(self.batchsize, start_train)
-            Xdev, Ydev, Ddev = self.make_batch(self.batchsize, start_dev, data="test")
+            X, Y = self.make_batch(times, data="train")
+            Xdev, Ydev = self.make_batch(times_dev, data="test")
 
             if i % 5 == 0:
                 [tloss, dloss, s] = sess.run([train_loss, dev_loss, summ],
-                                             feed_dict={x: X, y: Y, day: D,
-                                                        xdev: Xdev, ydev: Ydev, daydev: Ddev})
+                                             feed_dict={x: X, y: Y, xdev: Xdev, ydev: Ydev})
                 writer.add_summary(s, i)
                 writer.flush()
 
-            sess.run(train_step, feed_dict={x: X, y: Y, day: D,
-                                            xdev: Xdev, ydev: Ydev, daydev: Ddev})
+            sess.run(train_step, feed_dict={x: X, y: Y, xdev: Xdev, ydev: Ydev})
 
     def make_forecasts(self):
         # Start clean
@@ -188,7 +200,7 @@ class NeuralNetForecaster(Forecaster):
 
         forecasts = []
         for t in np.arange(0, self.ntest - self.present - self.future + 1, 12):
-            x, y, DoY = self.featurize(t, data="test")
+            x, y = self.featurize(t, data="test")
 
             # reshape to row vector
             x = np.array(x, dtype=np.float32)[np.newaxis,:]
