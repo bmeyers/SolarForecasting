@@ -27,15 +27,16 @@ class NeuralNetForecaster(Forecaster):
     # Additional constructor arguments:
 
     * arch         - neural network architecture (default to "dense")
-    * nepochs      - number of training epochs (default to 100)
+    * niter        - number of training iterations (default to 1000)
     * batchsize    - number of training examples in gradient approximation (default to 32)
     * learningrate - learning rate for gradient descent
+    * sampling     - tells how to generate batches (rand or seq)
     * logdir       - directory for TensorBoard logs
     * rmlogdir     - tells whether or not to remove an existing TensorBoard directory log
     """
     def __init__(self, train, test, present=12*5, future=12*3,
                  train_selection="all", test_selection="hourly", logdir="./tmp/debug/", rmlogdir=False,
-                 arch="FC", learningrate=1e-2, nepochs=1000, batchsize=100):
+                 arch="FC", learningrate=1e-2, niter=1000, batchsize=100, sampling="rand"):
         assert len(train) >= present + future, "present + future size must be smaller than training set"
         assert len(test) >= present, "present size must be smaller than test set"
 
@@ -45,9 +46,10 @@ class NeuralNetForecaster(Forecaster):
         self.future = future
 
         self.arch = arch
-        self.nepochs = nepochs
+        self.niter = niter
         self.batchsize = batchsize
         self.learningrate = learningrate
+        self.sampling = sampling
 
         self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
         self.response = train.iloc[:,-1] # assume aggregate power is in column n
@@ -60,11 +62,8 @@ class NeuralNetForecaster(Forecaster):
 
         self.ntest = self.features_dev.shape[0]
 
-        if arch == "FC":
-            # self.nn = FC([512,512,future])
-            self.nn = FC([100,80,future], regularizer=l2(.1))
-        elif arch == "CNN":
-            self.nn = None
+        if arch == "FC1":
+            self.nn = FC([2000,1000,future], regularizer=l2(0.0001))
 
         self.logdir = logdir
 
@@ -96,7 +95,7 @@ class NeuralNetForecaster(Forecaster):
 
     def make_batch(self, size, start, data="train"):
         """
-        Produces batches of given size.
+        Produces batches of given `size` starting from time `start`.
         """
 
         X = []; Y = []
@@ -160,13 +159,20 @@ class NeuralNetForecaster(Forecaster):
         writer = tf.summary.FileWriter(self.logdir + self.arch)
         writer.add_graph(sess.graph)
 
-        for i in range(self.nepochs):
-            start_train = i % (self.ntrain - self.present - self.future)
-            start_dev = np.random.randint(self.ntest - self.present - self.future)
+        tail = self.batchsize + self.present + self.future
+
+        for i in range(self.niter):
+            # define start of batch
+            if self.sampling == "rand":
+                start_train = np.random.randint(self.ntrain - tail)
+            elif self.sampling == "seq":
+                start_train = i % (self.ntrain - tail)
+
+            start_dev = np.random.randint(self.ntest - tail)
 
             # create batch
             X, Y, D = self.make_batch(self.batchsize, start_train)
-            Xdev, Ydev, Ddev = self.make_batch(self.batchsize, start_dev)
+            Xdev, Ydev, Ddev = self.make_batch(self.batchsize, start_dev, data="test")
 
             if i % 5 == 0:
                 [tloss, dloss, s] = sess.run([train_loss, dev_loss, summ],
@@ -174,9 +180,6 @@ class NeuralNetForecaster(Forecaster):
                                                         xdev: Xdev, ydev: Ydev, daydev: Ddev})
                 writer.add_summary(s, i)
                 writer.flush()
-
-            if i % 100 == 0:
-                print("Done with batch {}".format(i+1))
 
             sess.run(train_step, feed_dict={x: X, y: Y, day: D,
                                             xdev: Xdev, ydev: Ydev, daydev: Ddev})
