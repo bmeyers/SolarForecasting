@@ -39,15 +39,6 @@ class NeuralNetForecaster(Forecaster):
 
         self.train = train
         self.test = test
-        self.present = present
-        self.future = future
-
-        self.arch = arch
-        self.niter = niter
-        self.batchsize = batchsize
-        self.learningrate = learningrate
-        self.sampling = sampling
-        self.exo = exo
 
         self.features = train.iloc[:,0:-1] # assume inverters are in columns 2, 3, ..., n-1
         self.response = train.iloc[:,-1] # assume aggregate power is in column n
@@ -59,10 +50,18 @@ class NeuralNetForecaster(Forecaster):
         self.DoY_dev = self.features_dev.index.dayofyear
         self.ToD_dev = self.features_dev.index.time
 
-        self.ntrain = self.features.shape[0]
-        self.ninverters = self.features.shape[1]
+        self.present = present
+        self.future = future
+        self.arch = arch
+        self.niter = niter
+        self.batchsize = batchsize
+        self.learningrate = learningrate
+        self.sampling = sampling
+        self.exo = exo
 
+        self.ntrain = self.features.shape[0]
         self.ntest = self.features_dev.shape[0]
+        self.ninverters = self.features.shape[1]
 
         if arch == "FC1":
             self.nn = FC([2000,1000,future], regularizer=l2(0.0001))
@@ -105,8 +104,7 @@ class NeuralNetForecaster(Forecaster):
             doy = (doy - 183.) / 105.36602868097478
             tod = ((tod.hour * 12 + tod.minute / 5) - 143.5) / 83.137937589686857
 
-            x.append(doy)
-            x.append(tod)
+            x.extend([doy, tod])
 
         return x, y
 
@@ -169,7 +167,6 @@ class NeuralNetForecaster(Forecaster):
         tail = self.batchsize + self.present + self.future
 
         for i in range(self.niter):
-            # define start of batch
             if self.sampling == "rand":
                 times = np.random.randint(0, self.ntrain - tail, size=self.batchsize)
             elif self.sampling == "seq":
