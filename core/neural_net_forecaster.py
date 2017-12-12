@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from shutil import rmtree
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -118,6 +117,9 @@ class NeuralNetForecaster(Forecaster):
         # choose among different architectures
         if arch == "FC1":
             self.nn = FC([2000,1000,self.future], regularizer=l2(0.0001))
+        elif arch == "CNN1":
+            self.nn = CNN([32,64,128,self.future],
+                          height=self.present, width=self.ninverters)
         else:
             raise ValueError("Invalid architecture")
 
@@ -283,6 +285,10 @@ class NeuralNetForecaster(Forecaster):
 
 
     def make_forecasts(self):
+        """
+        Train neural network on training set, predict on dev set,
+        and save forecasts on the object.
+        """
         # fire up training, can take a while...
         self.learn()
 

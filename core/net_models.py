@@ -33,13 +33,15 @@ class CNN(object):
     Given a flattened input example x, reshape it to an image with
     height and width and feed forward in the net.
     """
-    def __init__(self, layer_units, height, width, regularizer=None):
+    def __init__(self, layer_units, height, width, kernel_size=None, regularizer=None):
+        if kernel_size is None:
+            kernel_size = (3,width)
         nlayers = len(layer_units)
         self.height = height
         self.width = width
         self.layers = []
         for i in range(nlayers-1):
-            self.layers.append(Conv2D(layer_units[i], kernel_size=5,
+            self.layers.append(Conv2D(layer_units[i], kernel_size=kernel_size,
                                       activation=tf.nn.relu,
                                       kernel_regularizer=regularizer,
                                       padding='same'))
